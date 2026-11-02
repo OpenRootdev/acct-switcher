@@ -1,1 +1,0 @@
-{"default":{"identifier":"default","description":"The acct window: its own commands plus events.","local":true,"windows":["main"],"permissions":["core:default"]}}
