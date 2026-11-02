@@ -1,0 +1,36 @@
+# Cursor (a VS Code-based editor) keeps its sign-in in User\globalStorage\state.vscdb,
+# together with the rest of its global state (chat history, extension state). That
+# folder is moved per account; settings.json, keybindings and extensions stay shared.
+# Found with `acct learn cursor`.
+id = "cursor"
+name = "Cursor"
+strategy = "swap"
+detect = ['%LOCALAPPDATA%\Programs\cursor\Cursor.exe']
+processes = ["Cursor.exe"]
+launch = ['%LOCALAPPDATA%\Programs\cursor\Cursor.exe']
+notes = "Each account keeps its own chat history. Profiles only work on this PC and Windows user."
+
+[[state]]
+kind = "dir"
+path = '%APPDATA%\Cursor\User\globalStorage'
+mode = "move"
+
+[[state]]
+kind = "dir"
+path = '%APPDATA%\Cursor\Local Storage'
+mode = "move"
+
+[[state]]
+kind = "dir"
+path = '%APPDATA%\Cursor\Session Storage'
+mode = "move"
+
+[[state]]
+kind = "dir"
+path = '%APPDATA%\Cursor\IndexedDB'
+mode = "move"
+
+[[state]]
+kind = "dir"
+path = '%APPDATA%\Cursor\Network'
+mode = "move"

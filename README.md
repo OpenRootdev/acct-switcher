@@ -26,7 +26,7 @@
 
 acct keeps a saved sign-in for every account you use in an app. Pick one in the window, the tray or the terminal, and the app is signed in to it, with no password or browser sign-in.
 
-- Works with command-line tools and desktop apps. GitHub CLI, Azure CLI, Claude Code, Codex, GitHub Desktop and Discord are built in; any other app can be added with a short file.
+- Works with command-line tools and desktop apps. GitHub CLI, Azure CLI, Claude Code, Codex, Cursor, GitHub Desktop and Discord are built in; any other app can be added with a short file.
 - Saved sign-ins stay on your PC, encrypted for your Windows user.
 - Scripts and AI agents can switch accounts by name, and never see a password or token.
 

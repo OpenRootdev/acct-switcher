@@ -64,8 +64,10 @@ If you don't know where an app keeps its sign-in:
 acct learn slack
 ```
 
-acct looks for folders named like the app in AppData and your home folder, asks you to close
-the app, sign in, and close it again, then shows what changed (files, Electron session
-folders, Credential Manager entries). It writes a draft definition for you to check before
+acct looks for folders named like the app in AppData, your home folder and Microsoft Store app
+folders (`%LOCALAPPDATA%\Packages`), and for registry keys named like it under `HKCU\Software`.
+It asks you to close the app, sign in, and close it again (and checks that you did), then shows
+what changed: files, Electron session folders, registry keys and Credential Manager entries.
+Caches, logs and extension folders are ignored. It writes a draft definition for you to check before
 saving. Remove anything that is not sign-in data. A `Cache` folder in a profile only costs space;
 a settings file means settings switch with the account.

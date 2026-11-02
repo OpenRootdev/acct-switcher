@@ -492,11 +492,11 @@ fn save_current_interactively(ctx: &Ctx, app: &str) -> Result<(), Error> {
     let who = def.identity.as_ref().and_then(|s| acct_core::native::identity(s).ok().flatten());
     let suggestion = who.as_deref().map(acct_core::paths::slug).unwrap_or_else(|| "main".into());
     println!(
-        "{} is signed in{} but that account is not saved yet.",
+        "{} is signed in{} to an account acct hasn't saved yet. acct saves it first, so you can switch back to it.",
         def.name,
         who.map(|w| format!(" as {w}")).unwrap_or_default()
     );
-    let name = ask(&format!("Name for it [{suggestion}]: "));
+    let name = ask(&format!("Name for the account signed in now [{suggestion}]: "));
     let name = if name.is_empty() { suggestion } else { name };
     ctx.acct.save(&def.id, &name, ctx.actor)?;
     println!("{GREEN}✓{GREEN:#} Saved as {BOLD}{name}{BOLD:#}.");
@@ -548,12 +548,18 @@ fn add(
     }
     ctx.require_human("Signing in a new account")?;
     let def = ctx.acct.def(app)?.clone();
+    // Save the account that is signed in now before asking about the new one, so the two
+    // questions come in the order they happen.
+    if ctx.acct.overview(Some(app))?.first().is_some_and(|v| v.unsaved) {
+        save_current_interactively(ctx, app)?;
+        println!("Next, acct signs {} out so you can sign in another account.", def.name);
+    }
     let asked;
     let profile = match profile {
         Some(p) => p,
         None => {
             asked = loop {
-                let name = ask(&format!("Name for the new {} account (e.g. work): ", def.name));
+                let name = ask(&format!("Name for the new {} account you'll sign in (e.g. work): ", def.name));
                 if acct_core::paths::valid_name(&name) {
                     break name;
                 }
@@ -631,29 +637,53 @@ fn learn_app(ctx: &Ctx, id: &str, name: Option<String>, hint: Option<String>) ->
     let name = name.unwrap_or_else(|| id.to_string());
     let hint = hint.unwrap_or_else(|| id.to_string());
     let roots = learn::candidate_roots(&hint);
-    if roots.is_empty() {
-        println!("No folders named like {hint:?} in AppData or your home folder. Try --hint with part of the app's folder name.");
+    let registry = learn::registry_roots(&hint);
+    if roots.is_empty() && registry.is_empty() {
+        println!("No folders or registry keys named like {hint:?}. Try --hint with part of the app's folder name.");
         println!("acct will still watch Credential Manager.");
     } else {
         println!("Watching:");
         for r in &roots {
             println!("  {DIM}{}{DIM:#}", r.display());
         }
+        for k in &registry {
+            println!("  {DIM}HKCU\\{k}{DIM:#}");
+        }
     }
-    println!("\n{BOLD}1.{BOLD:#} Close {name} completely (also from the system tray).");
-    ask("   Press Enter when it is closed. ");
-    let before = learn::take(&roots)?;
-    println!("{BOLD}2.{BOLD:#} Open {name} and sign in (sign out first if it is already signed in).");
-    ask("   Press Enter when you see your account, with the app still open. ");
-    let (processes, launch) = learn::app_processes(&roots, &hint);
-    println!("{BOLD}3.{BOLD:#} Now close {name} completely again.");
-    ask("   Press Enter when it is closed. ");
-    let after = learn::take(&roots)?;
+    // Each step checks that the app really is closed or open, so pressing Enter early
+    // can't produce an empty comparison.
+    let running = || learn::app_processes(&roots, &hint);
+    let wait_closed = |step: &str| loop {
+        println!("\n{BOLD}{step}{BOLD:#} Close {name} completely (also from the system tray).");
+        ask("   Press Enter when it is closed. ");
+        let (open, _) = running();
+        if open.is_empty() {
+            break;
+        }
+        println!("   {YELLOW}{name} is still running{YELLOW:#} ({}).", open.join(", "));
+    };
+    wait_closed("1.");
+    let before = learn::take(&roots, &registry)?;
+    let (processes, launch) = loop {
+        println!("\n{BOLD}2.{BOLD:#} Open {name} and sign in. If it is already signed in, sign out and sign in again.");
+        let answer = ask("   Press Enter when you see your account, with the app still open (or type c to continue anyway): ");
+        let found = running();
+        if !found.0.is_empty() || answer.eq_ignore_ascii_case("c") {
+            break found;
+        }
+        println!("   {YELLOW}{name} doesn't seem to be running.{YELLOW:#} If it is, type c to continue.");
+    };
+    wait_closed("3.");
+    let after = learn::take(&roots, &registry)?;
     let mut report = learn::compare(&before, &after);
     report.processes = processes;
     report.launch = launch;
     if report.findings.is_empty() {
-        println!("\n{YELLOW}Nothing that looks like sign-in data changed.{YELLOW:#} The app may keep it somewhere else (try --hint), or in a place acct cannot swap (see README: limits).");
+        println!(
+            "\n{YELLOW}Nothing that looks like sign-in data changed{YELLOW:#} ({} changed files, all caches or logs).",
+            report.noise_files
+        );
+        println!("The app may keep its sign-in somewhere else (try --hint), or in a place acct cannot swap (see docs/how-it-works.md).");
         return Ok(());
     }
     let text = learn::draft(id, &name, &report);

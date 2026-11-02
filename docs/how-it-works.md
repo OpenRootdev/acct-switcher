@@ -10,6 +10,7 @@
 | Codex CLI (`codex`) | swaps `~/.codex/auth.json` |
 | GitHub Desktop | swaps its Credential Manager entries and its `Local Storage` folder |
 | Discord | swaps its `Local Storage` folder |
+| Cursor | swaps `User\globalStorage` (sign-in and chat history) and its session folders; settings stay shared |
 
 ## A switch, step by step
 

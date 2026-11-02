@@ -201,6 +201,7 @@ const BUILTIN: &[(&str, &str)] = &[
     ("codex", include_str!("../../../defs/codex.toml")),
     ("github-desktop", include_str!("../../../defs/github-desktop.toml")),
     ("discord", include_str!("../../../defs/discord.toml")),
+    ("cursor", include_str!("../../../defs/cursor.toml")),
 ];
 
 #[derive(Debug, Clone, Default)]
