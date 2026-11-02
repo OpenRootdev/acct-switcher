@@ -1,0 +1,18 @@
+# GitHub Desktop (Electron) signs in one account per host. The account list is
+# in its Local Storage; the token is in Credential Manager. Repositories and
+# settings are shared by all profiles.
+id = "github-desktop"
+name = "GitHub Desktop"
+strategy = "swap"
+detect = ['%LOCALAPPDATA%\GitHubDesktop\GitHubDesktop.exe']
+processes = ["GitHubDesktop.exe"]
+launch = ['%LOCALAPPDATA%\GitHubDesktop\GitHubDesktop.exe']
+
+[[state]]
+kind = "credential"
+pattern = "GitHub - https://*"
+
+[[state]]
+kind = "dir"
+path = '%APPDATA%\GitHub Desktop\Local Storage'
+mode = "move"

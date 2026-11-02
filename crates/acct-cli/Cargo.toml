@@ -1,0 +1,20 @@
+[package]
+name = "acct-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "acct: switch which account an app or CLI uses"
+
+[[bin]]
+name = "acct"
+path = "src/main.rs"
+
+[dependencies]
+acct-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+clap = { version = "4.5", features = ["derive", "wrap_help", "env"] }
+anstream = "0.6"
+anstyle = "1"

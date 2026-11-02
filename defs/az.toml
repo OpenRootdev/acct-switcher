@@ -1,0 +1,18 @@
+# Azure CLI keeps every signed-in user; `az account set` picks the active one.
+# On Windows the tokens live in the Web Account Manager (device-bound), so they
+# are never copied - acct only selects the account.
+id = "az"
+name = "Azure CLI"
+strategy = "native"
+detect = ["az"]
+login = ["az", "login", "--allow-no-subscriptions"]
+notes = "A profile is a user; switching selects that user's first subscription."
+
+[native]
+# Reading the profile file directly is much faster than `az account list`.
+list_file = "~/.azure/azureProfile.json"
+items = "/subscriptions"
+account = "/user/name"
+active = "/isDefault"
+value = "/id"
+switch = ["az", "account", "set", "--subscription", "{value}"]

@@ -1,0 +1,15 @@
+# Discord (Electron) keeps its session token in Local Storage, encrypted with a
+# key that only this Windows user on this PC can unlock. Discord hides to the
+# tray when closed, so acct force-closes it after a short wait.
+id = "discord"
+name = "Discord"
+strategy = "swap"
+detect = ['%LOCALAPPDATA%\Discord\Update.exe']
+processes = ["Discord.exe"]
+launch = ['%LOCALAPPDATA%\Discord\Update.exe', "--processStart", "Discord.exe"]
+notes = "Profiles only work on this PC and Windows user (Electron safeStorage)."
+
+[[state]]
+kind = "dir"
+path = '%APPDATA%\discord\Local Storage'
+mode = "move"

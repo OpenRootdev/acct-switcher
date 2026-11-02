@@ -1,0 +1,24 @@
+# Claude Code (standalone CLI) keeps one account: OAuth tokens in
+# ~/.claude/.credentials.json and the account record in ~/.claude.json.
+# Sessions inside the Claude desktop app sign in through the desktop app and
+# are not affected by switching.
+id = "claude"
+name = "Claude Code"
+strategy = "swap"
+detect = ["claude"]
+processes = ['*\.local\bin\claude.exe']
+login = ["claude", "auth", "login"]
+notes = "Close terminal Claude Code sessions before switching. Desktop app sessions are not affected."
+
+[identity]
+command = ["claude", "auth", "status", "--json"]
+pointer = "/email"
+
+[[state]]
+kind = "file"
+path = "~/.claude/.credentials.json"
+
+[[state]]
+kind = "json_key"
+path = "~/.claude.json"
+keys = ["/oauthAccount"]

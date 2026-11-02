@@ -1,0 +1,12 @@
+# Codex CLI keeps its sign-in in ~/.codex/auth.json (default file storage).
+id = "codex"
+name = "Codex CLI"
+strategy = "swap"
+detect = ["codex"]
+processes = ["codex.exe"]
+login = ["codex", "login"]
+notes = "Assumes file credential storage (the default). With cli_auth_credentials_store = \"keyring\", add a credential item."
+
+[[state]]
+kind = "file"
+path = "~/.codex/auth.json"

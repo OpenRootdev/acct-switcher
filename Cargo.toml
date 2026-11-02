@@ -1,0 +1,23 @@
+[workspace]
+resolver = "2"
+members = ["crates/acct-core", "crates/acct-cli", "apps/acct-desktop"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+rust-version = "1.89"
+
+[workspace.dependencies]
+acct-core = { path = "crates/acct-core" }
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+toml = "0.8"
+thiserror = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde", "std"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

@@ -1,0 +1,260 @@
+:root {
+  color-scheme: light dark;
+  --text: #1b1b1f;
+  --muted: #5f6368;
+  --faint: #8a8f96;
+  --surface: rgba(255, 255, 255, 0.72);
+  --surface-hover: rgba(0, 0, 0, 0.035);
+  --stroke: rgba(0, 0, 0, 0.08);
+  --accent: #005fb8;
+  --accent-text: #ffffff;
+  --accent-soft: rgba(0, 95, 184, 0.1);
+  --warn: #9d5d00;
+  --warn-soft: rgba(157, 93, 0, 0.09);
+  --danger: #c42b1c;
+  --overlay: rgba(255, 255, 255, 0.96);
+  --radius: 8px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text: #f3f3f3;
+    --muted: #b4b4b8;
+    --faint: #8b8b90;
+    --surface: rgba(255, 255, 255, 0.055);
+    --surface-hover: rgba(255, 255, 255, 0.045);
+    --stroke: rgba(255, 255, 255, 0.075);
+    --accent: #60cdff;
+    --accent-text: #00243a;
+    --accent-soft: rgba(96, 205, 255, 0.12);
+    --warn: #fce100;
+    --warn-soft: rgba(252, 225, 0, 0.08);
+    --danger: #ff99a4;
+    --overlay: rgba(44, 44, 48, 0.98);
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  /* Transparent so the Windows 11 Mica backdrop shows through. */
+  background: transparent;
+  color: var(--text);
+  font: 13px/1.4 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+button, input { font: inherit; color: inherit; }
+
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--faint);
+  border: 3px solid transparent;
+  border-radius: 6px;
+  background-clip: padding-box;
+  opacity: 0.6;
+}
+::-webkit-scrollbar-thumb:hover { border-width: 2px; }
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 6px;
+}
+
+h1 {
+  margin: 0;
+  font: 600 20px/1.2 "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+}
+
+.top-actions { display: flex; gap: 2px; }
+
+button.icon {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: default;
+}
+button.icon:hover { background: var(--surface-hover); color: var(--text); }
+button.icon svg { width: 16px; height: 16px; }
+button.icon.spin svg { animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+main { padding: 4px 16px 24px; }
+
+.empty { color: var(--muted); padding: 24px 2px; margin: 0; }
+
+section.app { margin-top: 14px; }
+
+.app-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 0 2px 6px;
+}
+.app-head h2 { margin: 0; font-size: 13px; font-weight: 600; }
+.app-head .meta { color: var(--faint); font-size: 12px; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 6px 6px 6px 12px;
+  border-top: 1px solid var(--stroke);
+  cursor: default;
+}
+.row:first-child { border-top: 0; }
+.row:hover { background: var(--surface-hover); }
+.row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid var(--faint);
+}
+.row.active .dot { background: var(--accent); border-color: var(--accent); }
+
+.who { flex: 1; min-width: 0; }
+.who .name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.who .id { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.state { color: var(--accent); font-size: 12px; padding-right: 6px; }
+
+.use {
+  border: 1px solid var(--stroke);
+  background: var(--surface);
+  border-radius: 5px;
+  padding: 3px 12px;
+  opacity: 0;
+}
+.row:hover .use, .row:focus-within .use { opacity: 1; }
+.use:hover { background: var(--accent); color: var(--accent-text); border-color: transparent; }
+
+.row .icon { width: 28px; height: 28px; opacity: 0.0; }
+.row:hover .icon, .row:focus-within .icon, .row .icon[aria-expanded="true"] { opacity: 1; }
+
+.row.add { color: var(--accent); gap: 8px; }
+.row.add .plus { width: 8px; text-align: center; font-size: 15px; line-height: 1; }
+
+.row.busy { pointer-events: none; }
+.row.busy .state, .row.busy .use { display: none; }
+.row.busy::after {
+  content: "";
+  width: 14px; height: 14px; margin-right: 8px;
+  border: 2px solid var(--stroke);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--accent-soft);
+  font-size: 12.5px;
+}
+.banner.warn { background: var(--warn-soft); }
+.banner p { margin: 0; flex: 1; }
+.banner button {
+  border: 1px solid var(--stroke);
+  background: var(--surface);
+  border-radius: 5px;
+  padding: 3px 10px;
+}
+.banner button.primary { background: var(--accent); color: var(--accent-text); border-color: transparent; }
+
+.note { color: var(--faint); font-size: 12px; padding: 6px 2px 0; }
+
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  padding: 8px 14px;
+  border-radius: 6px;
+  background: var(--overlay);
+  border: 1px solid var(--stroke);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  font-size: 12.5px;
+}
+#toast.error { color: var(--danger); }
+
+.menu {
+  position: fixed;
+  min-width: 180px;
+  padding: 4px;
+  background: var(--overlay);
+  border: 1px solid var(--stroke);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  z-index: 10;
+}
+.menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 7px 10px;
+  border-radius: 4px;
+}
+.menu button:hover { background: var(--surface-hover); }
+.menu button.danger { color: var(--danger); }
+.menu hr { border: 0; border-top: 1px solid var(--stroke); margin: 4px 0; }
+
+dialog {
+  width: min(360px, calc(100% - 32px));
+  padding: 20px;
+  border: 1px solid var(--stroke);
+  border-radius: 8px;
+  background: var(--overlay);
+  color: var(--text);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.24);
+}
+dialog::backdrop { background: rgba(0, 0, 0, 0.3); }
+dialog h2 { margin: 0 0 8px; font-size: 15px; font-weight: 600; }
+dialog p { margin: 0 0 14px; color: var(--muted); }
+dialog label { display: grid; gap: 6px; margin-bottom: 16px; }
+dialog label span { font-weight: 500; }
+dialog small { color: var(--faint); }
+dialog input {
+  padding: 6px 10px;
+  border: 1px solid var(--stroke);
+  border-bottom: 1px solid var(--faint);
+  border-radius: 5px;
+  background: var(--surface);
+  outline: none;
+}
+dialog input:focus { border-bottom: 2px solid var(--accent); }
+.dialog-buttons { display: flex; justify-content: flex-end; gap: 8px; }
+.dialog-buttons button {
+  min-width: 88px;
+  padding: 5px 14px;
+  border: 1px solid var(--stroke);
+  border-radius: 5px;
+  background: var(--surface);
+}
+.dialog-buttons button.primary { background: var(--accent); color: var(--accent-text); border-color: transparent; }
+.dialog-buttons button.danger { background: var(--danger); color: #fff; border-color: transparent; }

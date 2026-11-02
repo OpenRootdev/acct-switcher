@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>acct</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <h1>Accounts</h1>
+    <div class="top-actions">
+      <button class="icon" id="refresh" title="Refresh" aria-label="Refresh">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.61-3.89M13.5 2.5v3h-3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="icon" id="more" title="More" aria-label="More" aria-haspopup="menu">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.1" fill="currentColor"/><circle cx="8" cy="8" r="1.1" fill="currentColor"/><circle cx="12.5" cy="8" r="1.1" fill="currentColor"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main id="apps" aria-live="polite">
+    <p class="empty">Loading…</p>
+  </main>
+
+  <div id="toast" role="status" hidden></div>
+
+  <div id="menu" class="menu" role="menu" hidden></div>
+
+  <dialog id="dialog">
+    <form method="dialog" id="dialog-form">
+      <h2 id="dialog-title"></h2>
+      <p id="dialog-text"></p>
+      <label id="dialog-field" hidden>
+        <span id="dialog-label"></span>
+        <input id="dialog-input" autocomplete="off" spellcheck="false">
+        <small id="dialog-hint"></small>
+      </label>
+      <div class="dialog-buttons">
+        <button value="cancel" id="dialog-cancel" type="button">Cancel</button>
+        <button value="ok" id="dialog-ok" class="primary">OK</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
