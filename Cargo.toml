@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/acct-core", "crates/acct-cli", "apps/acct-desktop"]
+members = ["crates/acswi-core", "crates/acswi-cli", "apps/acswi-desktop"]
 
 [workspace.package]
 version = "0.1.0"
@@ -9,7 +9,7 @@ license = "MIT"
 rust-version = "1.89"
 
 [workspace.dependencies]
-acct-core = { path = "crates/acct-core" }
+acswi-core = { path = "crates/acswi-core" }
 anyhow = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }

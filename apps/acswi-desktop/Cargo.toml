@@ -1,20 +1,20 @@
 [package]
-name = "acct-desktop"
+name = "acswi-desktop"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "acct desktop app: account switcher window and tray"
+description = "Account Switcher desktop app: window and tray"
 
 [[bin]]
-name = "acct-desktop"
+name = "acswi-desktop"
 path = "src/main.rs"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-acct-core.workspace = true
+acswi-core.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tauri = { version = "2", features = ["tray-icon"] }

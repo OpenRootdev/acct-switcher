@@ -1,4 +1,4 @@
-//! `acct learn`: find where an unknown app keeps its sign-in by comparing the disk, the
+//! `acswi learn`: find where an unknown app keeps its sign-in by comparing the disk, the
 //! registry and Credential Manager before and after you sign in.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -329,7 +329,7 @@ pub fn draft(id: &str, name: &str, report: &Report) -> String {
         }
         p.to_string()
     };
-    let mut t = format!("# Draft made by `acct learn`. Review it, then save it to %APPDATA%\\acct\\apps\\{id}.toml\n");
+    let mut t = format!("# Draft made by `acswi learn`. Review it, then save it to %APPDATA%\\acswi\\apps\\{id}.toml\n");
     t += &format!("id = {}\nname = {}\nstrategy = \"swap\"\n", toml_str(id), toml_str(name));
     if !report.processes.is_empty() {
         let list: Vec<String> = report.processes.iter().map(|p| toml_str(p)).collect();
@@ -379,7 +379,7 @@ mod tests {
 
     #[test]
     fn registry_changes_are_found() {
-        let root = r"Software\acct-selftest-learn";
+        let root = r"Software\acswi-selftest-learn";
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         let _ = hkcu.delete_subkey_all(root);
         let (app, _) = hkcu.create_subkey(root).unwrap();
@@ -392,6 +392,6 @@ mod tests {
         let _ = hkcu.delete_subkey_all(root);
         let report = compare(&before, &after);
         let keys: Vec<&str> = report.findings.iter().filter(|f| f.kind == "registry").map(|f| f.target.as_str()).collect();
-        assert_eq!(keys, vec![r"Software\acct-selftest-learn\Auth"]);
+        assert_eq!(keys, vec![r"Software\acswi-selftest-learn\Auth"]);
     }
 }

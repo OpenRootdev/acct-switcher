@@ -13,6 +13,7 @@ use crate::error::{Code, Error, Result};
 use crate::paths::Paths;
 use crate::state::write_atomic;
 
+// From when the tool was called acct; kept so vaults saved then still open.
 const MAGIC: &[u8; 6] = b"ACCT1\n";
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -137,7 +138,7 @@ impl Vault {
         };
         let body = bytes
             .strip_prefix(MAGIC.as_slice())
-            .ok_or_else(|| Error::new(Code::Crypto, format!("{} is not an acct vault file", path.display())))?;
+            .ok_or_else(|| Error::new(Code::Crypto, format!("{} is not an acswi vault file", path.display())))?;
         let mut plain = dpapi::unprotect(body, &self.entropy)?;
         let snap = rmp_serde::from_slice(&plain).map_err(|e| Error::new(Code::Crypto, format!("{}: {e}", path.display())));
         plain.zeroize();

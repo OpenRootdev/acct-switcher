@@ -1,7 +1,7 @@
 # Adding an app
 
-acct knows an app from a short TOML file. The built-in ones are in [`defs/`](../defs). Put your own
-in `%APPDATA%\acct\apps\` (the desktop app's … menu opens the folder); a file with the same `id`
+acswi knows an app from a short TOML file. The built-in ones are in [`defs/`](../defs). Put your own
+in `%APPDATA%\acswi\apps\` (the desktop app's … menu opens the folder); a file with the same `id`
 as a built-in one replaces it.
 
 ```toml
@@ -56,15 +56,15 @@ strategy = "env"            # one config folder per profile, picked by a user va
 var = "TOOL_CONFIG_DIR"     # only programs started after the switch see it
 ```
 
-## `acct learn`
+## `acswi learn`
 
 If you don't know where an app keeps its sign-in:
 
 ```
-acct learn slack
+acswi learn slack
 ```
 
-acct looks for folders named like the app in AppData, your home folder and Microsoft Store app
+acswi looks for folders named like the app in AppData, your home folder and Microsoft Store app
 folders (`%LOCALAPPDATA%\Packages`), and for registry keys named like it under `HKCU\Software`.
 It asks you to close the app, sign in, and close it again (and checks that you did), then shows
 what changed: files, Electron session folders, registry keys and Credential Manager entries.

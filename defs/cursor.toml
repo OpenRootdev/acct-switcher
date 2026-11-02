@@ -1,7 +1,7 @@
 # Cursor (a VS Code-based editor) keeps its sign-in in User\globalStorage\state.vscdb,
 # together with the rest of its global state (chat history, extension state). That
 # folder is moved per account; settings.json, keybindings and extensions stay shared.
-# Found with `acct learn cursor`.
+# Found with `acswi learn cursor`.
 id = "cursor"
 name = "Cursor"
 strategy = "swap"

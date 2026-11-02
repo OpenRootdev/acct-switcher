@@ -3,18 +3,18 @@ use std::path::{Path, PathBuf};
 
 use crate::error::{Error, Result};
 
-/// Where acct keeps its own files.
+/// Where acswi keeps its own files.
 #[derive(Debug, Clone)]
 pub struct Paths {
-    /// `%LOCALAPPDATA%\acct` (or `ACCT_HOME`): state, vault, moved folders.
+    /// `%LOCALAPPDATA%\acswi` (or `ACSWI_HOME`): state, vault, moved folders.
     pub root: PathBuf,
-    /// `%APPDATA%\acct\apps` (or `ACCT_HOME\apps`): user app definitions.
+    /// `%APPDATA%\acswi\apps` (or `ACSWI_HOME\apps`): user app definitions.
     pub user_defs: PathBuf,
 }
 
 impl Paths {
     pub fn from_env() -> Result<Self> {
-        if let Some(home) = env::var_os("ACCT_HOME") {
+        if let Some(home) = env::var_os("ACSWI_HOME") {
             let root = PathBuf::from(home);
             return Ok(Paths { user_defs: root.join("apps"), root });
         }
@@ -22,13 +22,31 @@ impl Paths {
         let roaming = env::var_os("APPDATA").map(PathBuf::from);
         match (local, roaming) {
             (Some(local), Some(roaming)) => Ok(Paths {
-                root: local.join("acct"),
-                user_defs: roaming.join("acct").join("apps"),
+                root: renamed_from_acct(&local),
+                user_defs: renamed_from_acct(&roaming).join("apps"),
             }),
             _ => Err(Error::new(crate::Code::Io, "LOCALAPPDATA/APPDATA are not set")),
         }
     }
 
+}
+
+/// `<base>\acswi`. The tool used to be called acct: an `<base>\acct` folder from then is
+/// renamed to `acswi` once. If it can't be renamed yet (an old acct is still running), it is
+/// used where it is, and renamed on a later run.
+fn renamed_from_acct(base: &Path) -> PathBuf {
+    let new = base.join("acswi");
+    let old = base.join("acct");
+    if new.exists() || !old.is_dir() {
+        return new;
+    }
+    match std::fs::rename(&old, &new) {
+        Ok(()) => new,
+        Err(_) => old,
+    }
+}
+
+impl Paths {
     pub fn state_file(&self) -> PathBuf {
         self.root.join("state.json")
     }
@@ -154,10 +172,23 @@ mod tests {
 
     #[test]
     fn expands_env_and_home() {
-        env::set_var("ACCT_TEST_VAR", "C:\\x");
-        assert_eq!(expand("%ACCT_TEST_VAR%/y"), PathBuf::from("C:\\x\\y"));
+        env::set_var("ACSWI_TEST_VAR", "C:\\x");
+        assert_eq!(expand("%ACSWI_TEST_VAR%/y"), PathBuf::from("C:\\x\\y"));
         assert_eq!(expand("%NOPE_NOT_SET%"), PathBuf::from("%NOPE_NOT_SET%"));
         assert!(expand("~/.codex").to_string_lossy().ends_with("\\.codex"));
+    }
+
+    #[test]
+    fn old_acct_folder_is_renamed_once() {
+        let base = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(base.path().join("acct").join("vault")).unwrap();
+        assert_eq!(renamed_from_acct(base.path()), base.path().join("acswi"));
+        assert!(base.path().join("acswi").join("vault").is_dir());
+        assert!(!base.path().join("acct").exists());
+        // A later acct folder doesn't replace data that is already in acswi.
+        std::fs::create_dir(base.path().join("acct")).unwrap();
+        assert_eq!(renamed_from_acct(base.path()), base.path().join("acswi"));
+        assert!(base.path().join("acct").is_dir());
     }
 
     #[test]

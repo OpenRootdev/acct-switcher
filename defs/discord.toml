@@ -1,6 +1,6 @@
 # Discord (Electron) keeps its session token in Local Storage, encrypted with a
 # key that only this Windows user on this PC can unlock. Discord hides to the
-# tray when closed, so acct force-closes it after a short wait.
+# tray when closed, so acswi force-closes it after a short wait.
 id = "discord"
 name = "Discord"
 strategy = "swap"

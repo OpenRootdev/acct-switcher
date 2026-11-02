@@ -3,12 +3,12 @@
 use std::fs;
 use std::path::Path;
 
-use acct_core::credman::{self, Credential};
-use acct_core::engine::{Acct, Actor, AddStep, SwitchOptions};
-use acct_core::paths::Paths;
-use acct_core::Code;
+use acswi_core::credman::{self, Credential};
+use acswi_core::engine::{Acswi, Actor, AddStep, SwitchOptions};
+use acswi_core::paths::Paths;
+use acswi_core::Code;
 
-const CRED: &str = "acct-selftest-swap:token";
+const CRED: &str = "acswi-selftest-swap:token";
 
 fn sign_in(live: &Path, who: &str, token: &str) {
     fs::create_dir_all(live.join("Session")).unwrap();
@@ -45,7 +45,7 @@ fn cred_user() -> Option<String> {
 #[test]
 fn full_cycle() {
     let tmp = tempfile::tempdir().unwrap();
-    let home = tmp.path().join("acct");
+    let home = tmp.path().join("acswi");
     let live = tmp.path().join("app");
     fs::create_dir_all(home.join("apps")).unwrap();
     let l = live.to_string_lossy().replace('\\', "/");
@@ -64,7 +64,7 @@ kind = "file"
 path = "{l}/auth.json"
 [[state]]
 kind = "credential"
-pattern = "acct-selftest-swap:*"
+pattern = "acswi-selftest-swap:*"
 [[state]]
 kind = "json_key"
 path = "{l}/cfg.json"
@@ -77,20 +77,20 @@ mode = "move"
         ),
     )
     .unwrap();
-    let acct = Acct::with_paths(Paths { root: home.clone(), user_defs: home.join("apps") }).unwrap();
-    assert!(acct.defs.errors.is_empty(), "{:?}", acct.defs.errors);
+    let acswi = Acswi::with_paths(Paths { root: home.clone(), user_defs: home.join("apps") }).unwrap();
+    assert!(acswi.defs.errors.is_empty(), "{:?}", acswi.defs.errors);
     let opts = SwitchOptions { relaunch: false, ..Default::default() };
 
     // An account that is signed in but not saved is never thrown away.
     sign_in(&live, "alice", "tokA1");
-    let err = acct.add_begin("selftest", "bob", &opts).unwrap_err();
+    let err = acswi.add_begin("selftest", "bob", &opts).unwrap_err();
     assert_eq!(err.code, Code::UnsavedSession);
 
-    acct.save("selftest", "alice", Actor::Cli).unwrap();
-    assert_eq!(acct.overview(Some("selftest")).unwrap()[0].active.as_deref(), Some("alice"));
+    acswi.save("selftest", "alice", Actor::Cli).unwrap();
+    assert_eq!(acswi.overview(Some("selftest")).unwrap()[0].active.as_deref(), Some("alice"));
 
     // Add bob: alice is saved, live state cleared (shared keys kept), then bob signs in.
-    match acct.add_begin("selftest", "bob", &opts).unwrap() {
+    match acswi.add_begin("selftest", "bob", &opts).unwrap() {
         AddStep::RunLogin { .. } => {}
         other => panic!("unexpected {other:?}"),
     }
@@ -100,12 +100,12 @@ mode = "move"
     let cfg: serde_json::Value = serde_json::from_slice(&fs::read(live.join("cfg.json")).unwrap()).unwrap();
     assert_eq!(cfg, serde_json::json!({ "theme": "dark" }), "only the account key is removed");
     sign_in(&live, "bob", "tokB1");
-    assert_eq!(acct.add_finish("selftest", &opts).unwrap(), "bob");
+    assert_eq!(acswi.add_finish("selftest", &opts).unwrap(), "bob");
 
     // Bob's refresh token rotates while he is active.
     fs::write(live.join("auth.json"), "tokB2").unwrap();
 
-    let r = acct.switch("selftest", "alice", &opts).unwrap();
+    let r = acswi.switch("selftest", "alice", &opts).unwrap();
     assert!(r.changed);
     assert_eq!(r.identity.as_deref(), Some("alice"));
     assert_eq!(live_token(&live).as_deref(), Some("tokA1"));
@@ -113,17 +113,17 @@ mode = "move"
     assert_eq!(fs::read_to_string(live.join("Session").join("db")).unwrap(), "alice");
 
     // Back to bob: the rotated token was kept.
-    acct.switch("selftest", "bob", &opts).unwrap();
+    acswi.switch("selftest", "bob", &opts).unwrap();
     assert_eq!(live_token(&live).as_deref(), Some("tokB2"));
     assert_eq!(fs::read_to_string(live.join("Session").join("db")).unwrap(), "bob");
     let cfg: serde_json::Value = serde_json::from_slice(&fs::read(live.join("cfg.json")).unwrap()).unwrap();
     assert_eq!(cfg["theme"], "dark");
     assert_eq!(cfg["account"], "bob");
 
-    // If someone signs in to a different account behind acct's back, acct refuses to
+    // If someone signs in to a different account behind acswi's back, acswi refuses to
     // file those tokens under bob and changes nothing.
     sign_in(&live, "mallory", "tokM");
-    let err = acct.switch("selftest", "alice", &opts).unwrap_err();
+    let err = acswi.switch("selftest", "alice", &opts).unwrap_err();
     assert_eq!(err.code, Code::IdentityMismatch);
     assert_eq!(live_token(&live).as_deref(), Some("tokM"));
     sign_in(&live, "bob", "tokB3");
@@ -133,11 +133,11 @@ mode = "move"
     assert!(!blob.windows(5).any(|w| w == b"tokA1"));
 
     // Rename, then remove (the active profile is protected).
-    acct.rename("selftest", "alice", "work").unwrap();
-    assert_eq!(acct.remove("selftest", "bob", Actor::Cli).unwrap_err().code, Code::Unsupported);
-    acct.switch("selftest", "work", &opts).unwrap();
+    acswi.rename("selftest", "alice", "work").unwrap();
+    assert_eq!(acswi.remove("selftest", "bob", Actor::Cli).unwrap_err().code, Code::Unsupported);
+    acswi.switch("selftest", "work", &opts).unwrap();
     assert_eq!(live_token(&live).as_deref(), Some("tokA1"));
-    acct.remove("selftest", "bob", Actor::Cli).unwrap();
+    acswi.remove("selftest", "bob", Actor::Cli).unwrap();
     assert!(!home.join("vault").join("selftest").join("bob.bin").exists());
 
     let audit = fs::read_to_string(home.join("audit.log")).unwrap();
@@ -150,7 +150,7 @@ mode = "move"
 #[test]
 fn cancel_add_restores_previous() {
     let tmp = tempfile::tempdir().unwrap();
-    let home = tmp.path().join("acct");
+    let home = tmp.path().join("acswi");
     let live = tmp.path().join("app");
     fs::create_dir_all(home.join("apps")).unwrap();
     fs::create_dir_all(&live).unwrap();
@@ -160,16 +160,16 @@ fn cancel_add_restores_previous() {
         format!("id='t2'\nname='T2'\nlogin=['cmd','/c','exit','0']\n[[state]]\nkind='file'\npath='{l}/auth.json'\n"),
     )
     .unwrap();
-    let acct = Acct::with_paths(Paths { root: home.clone(), user_defs: home.join("apps") }).unwrap();
+    let acswi = Acswi::with_paths(Paths { root: home.clone(), user_defs: home.join("apps") }).unwrap();
     let opts = SwitchOptions::default();
     fs::write(live.join("auth.json"), "first").unwrap();
-    acct.save("t2", "one", Actor::Cli).unwrap();
-    acct.add_begin("t2", "two", &opts).unwrap();
+    acswi.save("t2", "one", Actor::Cli).unwrap();
+    acswi.add_begin("t2", "two", &opts).unwrap();
     assert!(!live.join("auth.json").exists());
     fs::write(live.join("auth.json"), "half-done").unwrap();
-    assert_eq!(acct.add_cancel("t2", &opts).unwrap().as_deref(), Some("one"));
+    assert_eq!(acswi.add_cancel("t2", &opts).unwrap().as_deref(), Some("one"));
     assert_eq!(fs::read_to_string(live.join("auth.json")).unwrap(), "first");
-    let v = &acct.overview(Some("t2")).unwrap()[0];
+    let v = &acswi.overview(Some("t2")).unwrap()[0];
     assert_eq!(v.active.as_deref(), Some("one"));
     assert!(v.pending_add.is_none());
     assert_eq!(v.profiles.len(), 1);

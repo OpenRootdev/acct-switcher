@@ -45,7 +45,7 @@ pub struct ProfileView {
     pub active: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub identity: Option<String>,
-    /// Native accounts the app knows that have no acct profile yet are listed with
+    /// Native accounts the app knows that have no acswi profile yet are listed with
     /// `saved: false`; they can still be switched to by name.
     pub saved: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -136,22 +136,22 @@ enum Phase {
     Restoring,
 }
 
-pub struct Acct {
+pub struct Acswi {
     pub paths: Paths,
     pub defs: Defs,
 }
 
 struct Lock(#[allow(dead_code)] File);
 
-impl Acct {
-    pub fn open() -> Result<Acct> {
+impl Acswi {
+    pub fn open() -> Result<Acswi> {
         Self::with_paths(Paths::from_env()?)
     }
 
-    pub fn with_paths(paths: Paths) -> Result<Acct> {
+    pub fn with_paths(paths: Paths) -> Result<Acswi> {
         fs::create_dir_all(&paths.root).map_err(|e| Error::io(paths.root.display(), e))?;
         let defs = Defs::load(&paths.user_defs);
-        Ok(Acct { paths, defs })
+        Ok(Acswi { paths, defs })
     }
 
     fn lock(&self) -> Result<Lock> {
@@ -167,7 +167,7 @@ impl Acct {
             match file.try_lock() {
                 Ok(()) => return Ok(Lock(file)),
                 Err(_) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(100)),
-                Err(_) => bail!(Busy, "Another acct switch is in progress"),
+                Err(_) => bail!(Busy, "Another acswi switch is in progress"),
             }
         }
     }
@@ -364,7 +364,7 @@ impl Acct {
         let target = accounts.iter().find(|a| a.account == account).ok_or_else(|| {
             Error::new(
                 Code::UnknownProfile,
-                format!("{} no longer knows the account {account}. Sign in again with `acct add {} {profile}`.", def.name, def.id),
+                format!("{} no longer knows the account {account}. Sign in again with `acswi add {} {profile}`.", def.name, def.id),
             )
         })?;
         let from = accounts.iter().find(|a| a.active).map(|a| self.native_name(def, &a.account));
@@ -422,7 +422,7 @@ impl Acct {
         if !opts.close {
             return Err(Error::new(
                 Code::AppRunning,
-                format!("{} is running. Close it first, or pass --close to let acct close it.", def.name),
+                format!("{} is running. Close it first, or pass --close to let acswi close it.", def.name),
             )
             .with(serde_json::to_value(&running).unwrap()));
         }
@@ -434,7 +434,7 @@ impl Acct {
         let mut state = self.state()?;
         let app_state = state.app_mut(&def.id);
         if let Some(p) = &app_state.pending {
-            bail!(AddPending, "Adding {:?} is not finished. Run `acct add {} {} --finish` or `--cancel`.", p.profile, def.id, p.profile);
+            bail!(AddPending, "Adding {:?} is not finished. Run `acswi add {} {} --finish` or `--cancel`.", p.profile, def.id, p.profile);
         }
         if !app_state.profiles.contains_key(profile) {
             return Err(self.unknown_profile(def, profile));
@@ -487,7 +487,7 @@ impl Acct {
         Error::new(
             Code::UnsavedSession,
             format!(
-                "{} is signed in but that account is not saved yet. Save it first: `acct save {} <name>`",
+                "{} is signed in but that account is not saved yet. Save it first: `acswi save {} <name>`",
                 def.name, def.id
             ),
         )
@@ -524,7 +524,7 @@ impl Acct {
                     Code::IdentityMismatch,
                     format!(
                         "{} is signed in as {live}, but the active profile {profile:?} belongs to {rec}. Nothing was changed. \
-                         Save this account under its own name with `acct save {} <name>`, or pass --force to overwrite {profile:?}.",
+                         Save this account under its own name with `acswi save {} <name>`, or pass --force to overwrite {profile:?}.",
                         def.name, def.id
                     ),
                 ));
@@ -632,13 +632,13 @@ impl Acct {
                 p.identity = Some(active.account);
                 self.save_state(&state)?;
             }
-            Strategy::Env => bail!(Unsupported, "{} uses one folder per profile; use `acct add`", def.name),
+            Strategy::Env => bail!(Unsupported, "{} uses one folder per profile; use `acswi add`", def.name),
             Strategy::Swap => {
                 if let Some(active) = app_state.active.clone() {
                     if active != profile {
                         bail!(
                             ProfileExists,
-                            "{} is already saved as {active:?}. Use `acct rename {} {active} {profile}` to rename it.",
+                            "{} is already saved as {active:?}. Use `acswi rename {} {active} {profile}` to rename it.",
                             def.name,
                             def.id
                         );
@@ -781,7 +781,7 @@ impl Acct {
                     let active = accounts.iter().find(|a| a.active).map(|a| a.account.as_str()).unwrap_or("an existing account");
                     bail!(
                         CommandFailed,
-                        "{} is still signed in to {active}, which acct already has. Sign in to a different account, then finish again (or cancel).",
+                        "{} is still signed in to {active}, which acswi already has. Sign in to a different account, then finish again (or cancel).",
                         def.name
                     );
                 };
@@ -874,7 +874,7 @@ impl Acct {
         let _lock = self.lock()?;
         let mut state = self.state()?;
         if def.strategy == Strategy::Native && !state.app(&def.id).is_some_and(|a| a.profiles.contains_key(old)) {
-            // Give a name to an account the app knows but acct has not saved yet.
+            // Give a name to an account the app knows but acswi has not saved yet.
             let acc = self
                 .native_accounts(&def)?
                 .into_iter()

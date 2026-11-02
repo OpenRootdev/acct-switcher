@@ -1,6 +1,6 @@
-# acct — design
+# acswi — design
 
-`acct` keeps several signed-in accounts per app or CLI on one Windows PC and switches which
+`acswi` keeps several signed-in accounts per app or CLI on one Windows PC and switches which
 one the app uses, without signing in again. It is one account at a time per app, not
 side-by-side sessions.
 
@@ -16,7 +16,7 @@ side-by-side sessions.
    closed, and each switch is journaled so an interrupted one can be finished or rolled back.
 4. **As safe as the app itself, or safer.** Saved state is encrypted with DPAPI (bound to
    this Windows user on this PC). The CLI has no command that prints a secret.
-5. **Simple to use.** `acct gh work` switches. `acct` alone shows everything.
+5. **Simple to use.** `acswi gh work` switches. `acswi` alone shows everything.
 
 ## App definition
 
@@ -52,21 +52,21 @@ Strategies:
 - **swap**: close the app → save live state into the active profile → clear live state →
   restore the target profile → relaunch.
 - **native**: list accounts with a command, switch with a command. Accounts the tool already
-  knows show up as profiles automatically; `acct rename` gives them friendly names.
+  knows show up as profiles automatically; `acswi rename` gives them friendly names.
 - **env**: each profile gets its own config folder; switching sets a user environment variable
   (`CODEX_HOME`, `CLAUDE_CONFIG_DIR`, …). Nothing is copied, but settings and history are
   per-profile too, and only newly started programs see the change.
 
-Definitions are loaded from the built-ins and from `%APPDATA%\acct\apps\*.toml` (user
+Definitions are loaded from the built-ins and from `%APPDATA%\acswi\apps\*.toml` (user
 definitions win).
 
-## Adding a new app without knowing where it stores things: `acct learn`
+## Adding a new app without knowing where it stores things: `acswi learn`
 
-`acct learn <name>` records a fingerprint of likely locations (folders in `%APPDATA%`,
+`acswi learn <name>` records a fingerprint of likely locations (folders in `%APPDATA%`,
 `%LOCALAPPDATA%`, dot-folders in the home folder, Credential Manager targets), asks you to
 sign in to the app, then shows what changed and writes a draft definition for you to review.
 
-## Storage — `%LOCALAPPDATA%\acct\`
+## Storage — `%LOCALAPPDATA%\acswi\`
 
 | path | contents |
 |---|---|
@@ -114,8 +114,8 @@ sign in to the app, then shows what changed and writes a draft definition for yo
 ## Layout
 
 ```
-crates/acct-core      engine, definitions, vault, state stores, processes (Rust)
-crates/acct-cli       `acct` command
-apps/acct-desktop     Tauri v2 window + tray (no frontend framework)
+crates/acswi-core      engine, definitions, vault, state stores, processes (Rust)
+crates/acswi-cli       `acswi` command
+apps/acswi-desktop     Tauri v2 window + tray (no frontend framework)
 defs/                 built-in app definitions (embedded in the binaries)
 ```

@@ -3,10 +3,10 @@
 version = 4
 
 [[package]]
-name = "acct-cli"
+name = "acswi-cli"
 version = "0.1.0"
 dependencies = [
- "acct-core",
+ "acswi-core",
  "anstream 0.6.21",
  "anstyle",
  "chrono",
@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "acct-core"
+name = "acswi-core"
 version = "0.1.0"
 dependencies = [
  "chrono",
@@ -35,10 +35,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "acct-desktop"
+name = "acswi-desktop"
 version = "0.1.0"
 dependencies = [
- "acct-core",
+ "acswi-core",
  "serde",
  "serde_json",
  "tauri",

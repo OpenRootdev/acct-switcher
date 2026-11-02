@@ -161,7 +161,7 @@ pub fn close(specs: &[String], grace: Duration) -> Result<usize> {
     Err(Error::new(Code::AppRunning, "The app did not close").with(serde_json::to_value(find(specs)).unwrap()))
 }
 
-/// Starts a GUI app detached from acct.
+/// Starts a GUI app detached from acswi.
 pub fn launch(cmd: &[String]) -> Result<()> {
     let Some((prog, args)) = cmd.split_first() else { return Ok(()) };
     let path = which(prog).unwrap_or_else(|| expand(prog));

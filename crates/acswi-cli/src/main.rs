@@ -1,8 +1,8 @@
 use std::io::{BufRead, IsTerminal, Write};
 use std::process::ExitCode;
 
-use acct_core::engine::{Acct, Actor, AddStep, AppView, SwitchOptions};
-use acct_core::{learn, Code, Error, Strategy};
+use acswi_core::engine::{Acswi, Actor, AddStep, AppView, SwitchOptions};
+use acswi_core::{learn, Code, Error, Strategy};
 use anstream::{eprintln, println};
 use anstyle::{AnsiColor, Style};
 use clap::{Parser, Subcommand};
@@ -16,19 +16,19 @@ const RED: Style = AnsiColor::Red.on_default();
 
 /// Switch which account an app uses, without signing in again.
 ///
-///   acct                  pick an account from a list
-///   acct discord          Discord's accounts; pick one
-///   acct discord work     switch Discord to "work"
-///   acct add discord      sign in another Discord account and save it
+///   acswi                  pick an account from a list
+///   acswi discord          Discord's accounts; pick one
+///   acswi discord work     switch Discord to "work"
+///   acswi add discord      sign in another Discord account and save it
 #[derive(Parser)]
-#[command(name = "acct", version, verbatim_doc_comment, disable_help_subcommand = true)]
+#[command(name = "acswi", version, verbatim_doc_comment, disable_help_subcommand = true)]
 struct Cli {
     /// Print machine-readable JSON (for scripts and AI agents)
     #[arg(long, global = true)]
     json: bool,
 
     /// Who is making the change, for the audit log
-    #[arg(long, global = true, value_enum, hide = true, env = "ACCT_ACTOR")]
+    #[arg(long, global = true, value_enum, hide = true, env = "ACSWI_ACTOR")]
     actor: Option<ActorArg>,
 
     #[command(subcommand)]
@@ -83,7 +83,7 @@ enum Cmd {
         #[arg(long)]
         cancel: bool,
         /// Extra options for the app's sign-in command, after `--`
-        /// (e.g. `acct add az work -- --tenant contoso.onmicrosoft.com`)
+        /// (e.g. `acswi add az work -- --tenant contoso.onmicrosoft.com`)
         #[arg(last = true)]
         login_args: Vec<String>,
     },
@@ -102,9 +102,9 @@ enum Cmd {
     },
     /// Show who each app is signed in as right now
     Status { app: Option<String> },
-    /// List the apps acct knows how to switch
+    /// List the apps acswi knows how to switch
     Apps,
-    /// Teach acct a new app by watching what changes when you sign in
+    /// Teach acswi a new app by watching what changes when you sign in
     Learn {
         /// Short id for the new app, e.g. "slack"
         id: String,
@@ -115,9 +115,9 @@ enum Cmd {
         #[arg(long)]
         hint: Option<String>,
     },
-    /// Check acct's setup and finish any interrupted switch
+    /// Check acswi's setup and finish any interrupted switch
     Doctor,
-    /// `acct <app>` lists an app, `acct <app> <profile>` switches it
+    /// `acswi <app>` lists an app, `acswi <app> <profile>` switches it
     #[command(external_subcommand)]
     Shortcut(Vec<String>),
 }
@@ -135,7 +135,7 @@ struct Err<'a> {
 }
 
 struct Ctx {
-    acct: Acct,
+    acswi: Acswi,
     json: bool,
     actor: Actor,
 }
@@ -151,7 +151,7 @@ impl Ctx {
         } else {
             Err(Error::new(
                 Code::NeedsHuman,
-                format!("{what} needs a person at the keyboard. Run it in a terminal, or use the acct app."),
+                format!("{what} needs a person at the keyboard. Run it in a terminal, or use the acswi app."),
             ))
         }
     }
@@ -171,7 +171,7 @@ impl Ctx {
 
 fn main() -> ExitCode {
     let mut cli = Cli::parse();
-    // Flags typed after a shortcut (`acct gh work --json`) arrive as plain arguments.
+    // Flags typed after a shortcut (`acswi gh work --json`) arrive as plain arguments.
     let mut shortcut_close = false;
     if let Some(Cmd::Shortcut(args)) = &mut cli.command {
         args.retain(|a| match a.as_str() {
@@ -195,8 +195,8 @@ fn main() -> ExitCode {
         None if !std::io::stdin().is_terminal() => Actor::Agent,
         None => Actor::Cli,
     };
-    let result = Acct::open().and_then(|acct| {
-        let ctx = Ctx { acct, json, actor };
+    let result = Acswi::open().and_then(|acswi| {
+        let ctx = Ctx { acswi, json, actor };
         run(&ctx, cli.command, shortcut_close)
     });
     match result {
@@ -229,7 +229,7 @@ fn run(ctx: &Ctx, cmd: Option<Cmd>, shortcut_close: bool) -> Result<(), Error> {
         }
         Some(Cmd::Save { app, profile }) => save(ctx, &app, profile.as_deref()),
         Some(Cmd::Rename { app, old, new }) => {
-            ctx.acct.rename(&app, &old, &new)?;
+            ctx.acswi.rename(&app, &old, &new)?;
             ctx.emit(serde_json::json!({ "app": app, "from": old, "to": new }), |_| {
                 println!("Renamed {BOLD}{old}{BOLD:#} to {BOLD}{new}{BOLD:#}.")
             });
@@ -243,7 +243,7 @@ fn run(ctx: &Ctx, cmd: Option<Cmd>, shortcut_close: bool) -> Result<(), Error> {
                     return Ok(());
                 }
             }
-            ctx.acct.remove(&app, &profile, ctx.actor)?;
+            ctx.acswi.remove(&app, &profile, ctx.actor)?;
             ctx.emit(serde_json::json!({ "app": app, "removed": profile }), |_| println!("Deleted {profile}."));
             Ok(())
         }
@@ -255,7 +255,7 @@ fn run(ctx: &Ctx, cmd: Option<Cmd>, shortcut_close: bool) -> Result<(), Error> {
             [app] if ctx.interactive() => menu(ctx, Some(app)),
             [app] => list(ctx, Some(app), true),
             [app, profile] => use_profile(ctx, app, profile, shortcut_close, true, false),
-            _ => Err(Error::new(Code::InvalidName, "Usage: acct <app> [profile]. Run `acct --help` for all commands.")),
+            _ => Err(Error::new(Code::InvalidName, "Usage: acswi <app> [profile]. Run `acswi --help` for all commands.")),
         },
     }
 }
@@ -263,14 +263,14 @@ fn run(ctx: &Ctx, cmd: Option<Cmd>, shortcut_close: bool) -> Result<(), Error> {
 // ------------------------------------------------------------------ list / status
 
 fn list(ctx: &Ctx, app: Option<&str>, all: bool) -> Result<(), Error> {
-    let views = ctx.acct.overview(app)?;
+    let views = ctx.acswi.overview(app)?;
     let shown: Vec<AppView> = views
         .into_iter()
         .filter(|v| all || app.is_some() || v.installed || !v.profiles.is_empty())
         .collect();
     ctx.emit(shown, |views| {
         if views.is_empty() {
-            println!("No apps found. Run `acct apps` to see what acct can switch.");
+            println!("No apps found. Run `acswi apps` to see what acswi can switch.");
         }
         for (i, v) in views.iter().enumerate() {
             if i > 0 {
@@ -297,10 +297,10 @@ fn print_app(v: &AppView, first: Option<usize>) {
         println!("  {YELLOW}!{YELLOW:#} {w}");
     }
     if let Some(p) = &v.pending_add {
-        println!("  {YELLOW}!{YELLOW:#} adding {p:?} is not finished: acct add {} --finish (or --cancel)", v.id);
+        println!("  {YELLOW}!{YELLOW:#} adding {p:?} is not finished: acswi add {} --finish (or --cancel)", v.id);
     }
     if v.profiles.is_empty() {
-        let hint = if first.is_some() { "type a to add one".to_string() } else { format!("acct add {}", v.id) };
+        let hint = if first.is_some() { "type a to add one".to_string() } else { format!("acswi add {}", v.id) };
         println!("  {DIM}no accounts yet · {hint}{DIM:#}");
         return;
     }
@@ -316,16 +316,16 @@ fn print_app(v: &AppView, first: Option<usize>) {
     }
 }
 
-/// `acct` or `acct <app>` in a terminal: numbered accounts, then switch or add by typing.
+/// `acswi` or `acswi <app>` in a terminal: numbered accounts, then switch or add by typing.
 fn menu(ctx: &Ctx, app: Option<&str>) -> Result<(), Error> {
     let views: Vec<AppView> = ctx
-        .acct
+        .acswi
         .overview(app)?
         .into_iter()
         .filter(|v| app.is_some() || v.installed || !v.profiles.is_empty())
         .collect();
     if views.is_empty() {
-        println!("No apps found. Run `acct apps` to see what acct can switch.");
+        println!("No apps found. Run `acswi apps` to see what acswi can switch.");
         return Ok(());
     }
     let mut choices: Vec<(&str, &str)> = Vec::new();
@@ -382,9 +382,9 @@ fn pick_app(views: &[AppView]) -> Option<String> {
 
 fn status(ctx: &Ctx, app: Option<&str>) -> Result<(), Error> {
     let ids: Vec<String> = match app {
-        Some(a) => vec![ctx.acct.def(a)?.id.clone()],
+        Some(a) => vec![ctx.acswi.def(a)?.id.clone()],
         None => ctx
-            .acct
+            .acswi
             .overview(None)?
             .into_iter()
             .filter(|v| v.installed && (!v.profiles.is_empty() || v.strategy == Strategy::Native))
@@ -393,7 +393,7 @@ fn status(ctx: &Ctx, app: Option<&str>) -> Result<(), Error> {
     };
     let mut out = Vec::new();
     for id in ids {
-        out.push(ctx.acct.status(&id)?);
+        out.push(ctx.acswi.status(&id)?);
     }
     ctx.emit(out, |rows| {
         for s in rows {
@@ -421,7 +421,7 @@ fn apps(ctx: &Ctx) -> Result<(), Error> {
         source: String,
     }
     let rows: Vec<Row> = ctx
-        .acct
+        .acswi
         .defs
         .apps
         .values()
@@ -433,7 +433,7 @@ fn apps(ctx: &Ctx) -> Result<(), Error> {
             source: d.source.as_ref().map(|p| p.display().to_string()).unwrap_or_else(|| "built-in".into()),
         })
         .collect();
-    let errors = ctx.acct.defs.errors.clone();
+    let errors = ctx.acswi.defs.errors.clone();
     ctx.emit(serde_json::json!({ "apps": rows, "errors": errors }), |_| {
         for r in &rows {
             let how = match r.strategy {
@@ -447,7 +447,7 @@ fn apps(ctx: &Ctx) -> Result<(), Error> {
         for e in &errors {
             println!("{RED}!{RED:#} {}", e.message);
         }
-        println!("\n{DIM}Add your own: acct learn <id>, or put a .toml file in %APPDATA%\\acct\\apps{DIM:#}");
+        println!("\n{DIM}Add your own: acswi learn <id>, or put a .toml file in %APPDATA%\\acswi\\apps{DIM:#}");
     });
     Ok(())
 }
@@ -457,10 +457,10 @@ fn apps(ctx: &Ctx) -> Result<(), Error> {
 fn use_profile(ctx: &Ctx, app: &str, profile: &str, close: bool, relaunch: bool, force: bool) -> Result<(), Error> {
     let mut close = close;
     let report = loop {
-        match ctx.acct.switch(app, profile, &ctx.opts(close, relaunch, force)) {
+        match ctx.acswi.switch(app, profile, &ctx.opts(close, relaunch, force)) {
             Ok(r) => break r,
             Err(e) if e.code == Code::AppRunning && !close && ctx.interactive() => {
-                let name = ctx.acct.def(app)?.name.clone();
+                let name = ctx.acswi.def(app)?.name.clone();
                 if !confirm(&format!("{name} is open. Close it and switch? [Y/n] ")) {
                     return Err(e);
                 }
@@ -473,7 +473,7 @@ fn use_profile(ctx: &Ctx, app: &str, profile: &str, close: bool, relaunch: bool,
         }
     };
     ctx.emit(&report, |r| {
-        let name = ctx.acct.def(&r.app).map(|d| d.name.clone()).unwrap_or_default();
+        let name = ctx.acswi.def(&r.app).map(|d| d.name.clone()).unwrap_or_default();
         if !r.changed {
             println!("{name} is already using {BOLD}{}{BOLD:#}.", r.to);
             return;
@@ -488,17 +488,17 @@ fn use_profile(ctx: &Ctx, app: &str, profile: &str, close: bool, relaunch: bool,
 }
 
 fn save_current_interactively(ctx: &Ctx, app: &str) -> Result<(), Error> {
-    let def = ctx.acct.def(app)?.clone();
-    let who = def.identity.as_ref().and_then(|s| acct_core::native::identity(s).ok().flatten());
-    let suggestion = who.as_deref().map(acct_core::paths::slug).unwrap_or_else(|| "main".into());
+    let def = ctx.acswi.def(app)?.clone();
+    let who = def.identity.as_ref().and_then(|s| acswi_core::native::identity(s).ok().flatten());
+    let suggestion = who.as_deref().map(acswi_core::paths::slug).unwrap_or_else(|| "main".into());
     println!(
-        "{} is signed in{} to an account acct hasn't saved yet. acct saves it first, so you can switch back to it.",
+        "{} is signed in{} to an account acswi hasn't saved yet. acswi saves it first, so you can switch back to it.",
         def.name,
         who.map(|w| format!(" as {w}")).unwrap_or_default()
     );
     let name = ask(&format!("Name for the account signed in now [{suggestion}]: "));
     let name = if name.is_empty() { suggestion } else { name };
-    ctx.acct.save(&def.id, &name, ctx.actor)?;
+    ctx.acswi.save(&def.id, &name, ctx.actor)?;
     println!("{GREEN}✓{GREEN:#} Saved as {BOLD}{name}{BOLD:#}.");
     Ok(())
 }
@@ -506,16 +506,16 @@ fn save_current_interactively(ctx: &Ctx, app: &str) -> Result<(), Error> {
 fn save(ctx: &Ctx, app: &str, profile: Option<&str>) -> Result<(), Error> {
     match profile {
         Some(p) => {
-            ctx.acct.save(app, p, ctx.actor)?;
+            ctx.acswi.save(app, p, ctx.actor)?;
             ctx.emit(serde_json::json!({ "app": app, "saved": p }), |_| {
                 println!("{GREEN}✓{GREEN:#} Saved the current {app} account as {BOLD}{p}{BOLD:#}.")
             });
         }
         None => {
-            let refreshed = ctx.acct.refresh(app)?;
+            let refreshed = ctx.acswi.refresh(app)?;
             ctx.emit(serde_json::json!({ "app": app, "refreshed": refreshed }), |r| match r["refreshed"].as_str() {
                 Some(p) => println!("{GREEN}✓{GREEN:#} Updated the saved copy of {BOLD}{p}{BOLD:#}."),
-                None => println!("Nothing to update. Give the current account a name: acct save {app} <name>"),
+                None => println!("Nothing to update. Give the current account a name: acswi save {app} <name>"),
             });
         }
     }
@@ -533,26 +533,26 @@ fn add(
 ) -> Result<(), Error> {
     let opts = ctx.opts(close, true, false);
     if cancel {
-        let back = ctx.acct.add_cancel(app, &opts)?;
+        let back = ctx.acswi.add_cancel(app, &opts)?;
         ctx.emit(serde_json::json!({ "app": app, "cancelled": true, "active": back }), |_| {
             println!("Cancelled.{}", back.as_deref().map(|b| format!(" Back to {b}.")).unwrap_or_default())
         });
         return Ok(());
     }
     if finish {
-        let p = ctx.acct.add_finish(app, &opts)?;
+        let p = ctx.acswi.add_finish(app, &opts)?;
         ctx.emit(serde_json::json!({ "app": app, "added": p }), |_| {
             println!("{GREEN}✓{GREEN:#} Added {BOLD}{p}{BOLD:#}; it is now active.")
         });
         return Ok(());
     }
     ctx.require_human("Signing in a new account")?;
-    let def = ctx.acct.def(app)?.clone();
+    let def = ctx.acswi.def(app)?.clone();
     // Save the account that is signed in now before asking about the new one, so the two
     // questions come in the order they happen.
-    if ctx.acct.overview(Some(app))?.first().is_some_and(|v| v.unsaved) {
+    if ctx.acswi.overview(Some(app))?.first().is_some_and(|v| v.unsaved) {
         save_current_interactively(ctx, app)?;
-        println!("Next, acct signs {} out so you can sign in another account.", def.name);
+        println!("Next, acswi signs {} out so you can sign in another account.", def.name);
     }
     let asked;
     let profile = match profile {
@@ -560,7 +560,7 @@ fn add(
         None => {
             asked = loop {
                 let name = ask(&format!("Name for the new {} account you'll sign in (e.g. work): ", def.name));
-                if acct_core::paths::valid_name(&name) {
+                if acswi_core::paths::valid_name(&name) {
                     break name;
                 }
                 println!("{DIM}Use letters, digits, dots, dashes or underscores.{DIM:#}");
@@ -570,7 +570,7 @@ fn add(
     };
     let mut opts = opts;
     let step = loop {
-        match ctx.acct.add_begin(app, profile, &opts) {
+        match ctx.acswi.add_begin(app, profile, &opts) {
             Ok(s) => break s,
             Err(e) if e.code == Code::AppRunning && !opts.close => {
                 if !confirm(&format!("{} is open. Close it to sign in a new account? [Y/n] ", def.name)) {
@@ -587,9 +587,9 @@ fn add(
         AddStep::RunLogin { mut command, env } => {
             command.extend(login_args.iter().cloned());
             println!("{DIM}Signing in with: {}{DIM:#}", command.join(" "));
-            let ok = acct_core::process::run_interactive(&command, &env)?;
+            let ok = acswi_core::process::run_interactive(&command, &env)?;
             if !ok {
-                let back = ctx.acct.add_cancel(app, &opts)?;
+                let back = ctx.acswi.add_cancel(app, &opts)?;
                 return Err(Error::new(
                     Code::CommandFailed,
                     format!("Sign-in did not finish.{}", back.map(|b| format!(" Back to {b}.")).unwrap_or_default()),
@@ -601,7 +601,7 @@ fn add(
             println!("{} is opening with no account signed in.", def.name);
             let answer = ask("Sign in there. When you see your account, come back and press Enter (or type c to cancel): ");
             if answer.eq_ignore_ascii_case("c") {
-                let back = ctx.acct.add_cancel(app, &opts)?;
+                let back = ctx.acswi.add_cancel(app, &opts)?;
                 println!("Cancelled.{}", back.map(|b| format!(" Back to {b}.")).unwrap_or_default());
                 return Ok(());
             }
@@ -613,10 +613,10 @@ fn add(
 
 /// Finishes an add, accepting that it may already have been finished elsewhere (the desktop app).
 fn finish_add(ctx: &Ctx, app: &str, profile: &str, opts: &SwitchOptions) -> Result<(), Error> {
-    match ctx.acct.add_finish(app, opts) {
+    match ctx.acswi.add_finish(app, opts) {
         Ok(p) => println!("{GREEN}✓{GREEN:#} Added {BOLD}{p}{BOLD:#}; it is now active."),
         Err(e) if e.code == Code::UnknownProfile => {
-            let added = ctx.acct.overview(Some(app))?.iter().any(|v| v.profiles.iter().any(|p| p.name == profile));
+            let added = ctx.acswi.overview(Some(app))?.iter().any(|v| v.profiles.iter().any(|p| p.name == profile));
             if !added {
                 return Err(e);
             }
@@ -631,7 +631,7 @@ fn finish_add(ctx: &Ctx, app: &str, profile: &str, opts: &SwitchOptions) -> Resu
 
 fn learn_app(ctx: &Ctx, id: &str, name: Option<String>, hint: Option<String>) -> Result<(), Error> {
     ctx.require_human("Learning a new app")?;
-    if !acct_core::paths::valid_name(id) {
+    if !acswi_core::paths::valid_name(id) {
         return Err(Error::new(Code::InvalidName, format!("{id:?} is not a valid id")));
     }
     let name = name.unwrap_or_else(|| id.to_string());
@@ -640,7 +640,7 @@ fn learn_app(ctx: &Ctx, id: &str, name: Option<String>, hint: Option<String>) ->
     let registry = learn::registry_roots(&hint);
     if roots.is_empty() && registry.is_empty() {
         println!("No folders or registry keys named like {hint:?}. Try --hint with part of the app's folder name.");
-        println!("acct will still watch Credential Manager.");
+        println!("acswi will still watch Credential Manager.");
     } else {
         println!("Watching:");
         for r in &roots {
@@ -683,16 +683,16 @@ fn learn_app(ctx: &Ctx, id: &str, name: Option<String>, hint: Option<String>) ->
             "\n{YELLOW}Nothing that looks like sign-in data changed{YELLOW:#} ({} changed files, all caches or logs).",
             report.noise_files
         );
-        println!("The app may keep its sign-in somewhere else (try --hint), or in a place acct cannot swap (see docs/how-it-works.md).");
+        println!("The app may keep its sign-in somewhere else (try --hint), or in a place acswi cannot swap (see docs/how-it-works.md).");
         return Ok(());
     }
     let text = learn::draft(id, &name, &report);
     println!("\n{BOLD}Draft definition{BOLD:#}\n{DIM}──────────────{DIM:#}\n{text}");
-    let path = ctx.acct.paths.user_defs.join(format!("{id}.toml"));
+    let path = ctx.acswi.paths.user_defs.join(format!("{id}.toml"));
     if confirm(&format!("Save it to {}? [Y/n] ", path.display())) {
-        std::fs::create_dir_all(&ctx.acct.paths.user_defs).map_err(|e| Error::io("apps folder", e))?;
+        std::fs::create_dir_all(&ctx.acswi.paths.user_defs).map_err(|e| Error::io("apps folder", e))?;
         std::fs::write(&path, text).map_err(|e| Error::io(path.display(), e))?;
-        println!("{GREEN}✓{GREEN:#} Saved. Next: open {name}, sign in, then run `acct save {id} <name>`.");
+        println!("{GREEN}✓{GREEN:#} Saved. Next: open {name}, sign in, then run `acswi save {id} <name>`.");
         println!("  {DIM}Edit the file to remove anything that is not sign-in data.{DIM:#}");
     }
     Ok(())
@@ -706,13 +706,13 @@ fn doctor(ctx: &Ctx) -> Result<(), Error> {
         detail: String,
     }
     let mut checks = Vec::new();
-    let recovered = ctx.acct.recover()?;
+    let recovered = ctx.acswi.recover()?;
     checks.push(Check {
         name: "interrupted switch".into(),
         ok: true,
         detail: recovered.unwrap_or_else(|| "none".into()),
     });
-    let crypto = acct_core::dpapi::protect(b"acct", b"doctor").and_then(|c| acct_core::dpapi::unprotect(&c, b"doctor"));
+    let crypto = acswi_core::dpapi::protect(b"acswi", b"doctor").and_then(|c| acswi_core::dpapi::unprotect(&c, b"doctor"));
     checks.push(Check {
         name: "encryption (DPAPI)".into(),
         ok: crypto.is_ok(),
@@ -721,18 +721,18 @@ fn doctor(ctx: &Ctx) -> Result<(), Error> {
     checks.push(Check {
         name: "data folder".into(),
         ok: true,
-        detail: ctx.acct.paths.root.display().to_string(),
+        detail: ctx.acswi.paths.root.display().to_string(),
     });
     checks.push(Check {
         name: "your app definitions".into(),
-        ok: ctx.acct.defs.errors.is_empty(),
-        detail: if ctx.acct.defs.errors.is_empty() {
-            ctx.acct.paths.user_defs.display().to_string()
+        ok: ctx.acswi.defs.errors.is_empty(),
+        detail: if ctx.acswi.defs.errors.is_empty() {
+            ctx.acswi.paths.user_defs.display().to_string()
         } else {
-            ctx.acct.defs.errors.iter().map(|e| e.message.clone()).collect::<Vec<_>>().join("; ")
+            ctx.acswi.defs.errors.iter().map(|e| e.message.clone()).collect::<Vec<_>>().join("; ")
         },
     });
-    for v in ctx.acct.overview(None)? {
+    for v in ctx.acswi.overview(None)? {
         if !v.installed && v.profiles.is_empty() {
             continue;
         }

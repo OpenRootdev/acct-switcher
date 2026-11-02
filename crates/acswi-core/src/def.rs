@@ -14,7 +14,7 @@ pub enum Strategy {
     /// Save live state into the vault and restore another profile's state.
     #[default]
     Swap,
-    /// The app already keeps several accounts; acct calls its own switch command.
+    /// The app already keeps several accounts; acswi calls its own switch command.
     Native,
     /// One config folder per profile, selected by a user environment variable.
     Env,
@@ -132,7 +132,7 @@ pub struct AppDef {
     /// Program (and arguments) to start again after switching, if the app was running.
     #[serde(default)]
     pub launch: Vec<String>,
-    /// Command that signs in a new account. Without it, acct opens the app and waits.
+    /// Command that signs in a new account. Without it, acswi opens the app and waits.
     #[serde(default)]
     pub login: Vec<String>,
     /// Extra environment variables for the sign-in command only.
@@ -207,7 +207,7 @@ const BUILTIN: &[(&str, &str)] = &[
 #[derive(Debug, Clone, Default)]
 pub struct Defs {
     pub apps: BTreeMap<String, AppDef>,
-    /// Definitions that failed to load; reported by `acct doctor`.
+    /// Definitions that failed to load; reported by `acswi doctor`.
     pub errors: Vec<Error>,
 }
 
@@ -252,7 +252,7 @@ impl Defs {
             .values()
             .find(|d| d.id.eq_ignore_ascii_case(&lower) || d.name.eq_ignore_ascii_case(id))
             .ok_or_else(|| {
-                Error::new(Code::UnknownApp, format!("No app called {id:?}. Run `acct apps` to see the list."))
+                Error::new(Code::UnknownApp, format!("No app called {id:?}. Run `acswi apps` to see the list."))
                     .with(serde_json::json!({ "known": self.apps.keys().collect::<Vec<_>>() }))
             })
     }

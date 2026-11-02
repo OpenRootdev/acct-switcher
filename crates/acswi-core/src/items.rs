@@ -434,13 +434,13 @@ mod tests {
 
     #[test]
     fn json_pointer_edit_keeps_other_keys() {
-        let mut doc: Value = serde_json::json!({"a": 1, "acct": {"email": "x"}, "z": 2});
-        assert!(remove_pointer(&mut doc, "/acct"));
+        let mut doc: Value = serde_json::json!({"a": 1, "acswi": {"email": "x"}, "z": 2});
+        assert!(remove_pointer(&mut doc, "/acswi"));
         assert_eq!(doc, serde_json::json!({"a": 1, "z": 2}));
-        set_pointer(&mut doc, "/acct/email", Value::String("y".into()));
-        assert_eq!(doc["acct"]["email"], "y");
+        set_pointer(&mut doc, "/acswi/email", Value::String("y".into()));
+        assert_eq!(doc["acswi"]["email"], "y");
         let keys: Vec<_> = doc.as_object().unwrap().keys().cloned().collect();
-        assert_eq!(keys, ["a", "z", "acct"]);
+        assert_eq!(keys, ["a", "z", "acswi"]);
     }
 
     #[test]

@@ -1,10 +1,10 @@
 [package]
-name = "acct-core"
+name = "acswi-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Engine for acct: app definitions, encrypted vault and account switching"
+description = "Engine for acswi: app definitions, encrypted vault and account switching"
 
 [dependencies]
 serde.workspace = true

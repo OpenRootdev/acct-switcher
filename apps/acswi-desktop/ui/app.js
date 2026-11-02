@@ -167,7 +167,7 @@ async function switchTo(app, profile, row, close = false) {
     if (e.code === "app_running" && !close) {
       const ok = await ask({
         title: `Close ${app.name}?`,
-        text: `${app.name} is open. acct will close it, switch to ${profile} and open it again.`,
+        text: `${app.name} is open. acswi will close it, switch to ${profile} and open it again.`,
         ok: "Close and switch",
       });
       if (ok) return switchTo(app, profile, row, true);
@@ -204,7 +204,7 @@ async function saveCurrent(app) {
 
 async function addAccount(app, preset, close = false) {
   const how = app.strategy === "swap"
-    ? `acct signs ${app.name} out (your current account stays saved) so you can sign in to another one.`
+    ? `acswi signs ${app.name} out (your current account stays saved) so you can sign in to another one.`
     : `${app.name} will ask you to sign in. Your other accounts stay signed in.`;
   const name = preset || await ask({
     title: app.profiles.length ? `Add another ${app.name} account` : `Add an account to ${app.name}`,
@@ -268,7 +268,7 @@ async function removeProfile(app, p) {
   const ok = await ask({
     title: `Remove ${p.name}?`,
     text: app.strategy === "native"
-      ? `acct forgets the name “${p.name}”. ${app.name} itself stays signed in to ${p.identity || p.name}.`
+      ? `acswi forgets the name “${p.name}”. ${app.name} itself stays signed in to ${p.identity || p.name}.`
       : `The saved sign-in for ${p.name} is deleted. To use it again you will have to sign in again.`,
     ok: "Remove",
     danger: true,
@@ -415,18 +415,18 @@ function toast(text, isError = false) {
 
 // ------------------------------------------------------------------ events from Rust
 
-listen("acct://changed", ({ payload }) => {
+listen("acswi://changed", ({ payload }) => {
   delete waiting[payload.app];
   if (payload.error) toast(message(payload.error), true);
   else if (payload.message) toast(payload.message);
   load({ quiet: true });
 });
 
-listen("acct://confirm-close", async ({ payload }) => {
+listen("acswi://confirm-close", async ({ payload }) => {
   await load({ quiet: true });
   const ok = await ask({
     title: `Close ${payload.name}?`,
-    text: `${payload.name} is open. acct will close it, switch to ${payload.profile} and open it again.`,
+    text: `${payload.name} is open. acswi will close it, switch to ${payload.profile} and open it again.`,
     ok: "Close and switch",
   });
   if (!ok) return;

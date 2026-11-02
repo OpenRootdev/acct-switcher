@@ -1,4 +1,4 @@
-# GitHub CLI keeps several accounts per host itself (gh 2.40+), so acct only
+# GitHub CLI keeps several accounts per host itself (gh 2.40+), so acswi only
 # calls `gh auth switch`. Tokens stay where gh keeps them (Credential Manager).
 id = "gh"
 name = "GitHub CLI"

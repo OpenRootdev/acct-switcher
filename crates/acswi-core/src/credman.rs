@@ -129,7 +129,7 @@ pub fn read(filter: Option<&str>) -> Result<Vec<Credential>> {
     Ok(out)
 }
 
-/// Names and timestamps only, for change detection (`acct learn`).
+/// Names and timestamps only, for change detection (`acswi learn`).
 pub fn list_info(filter: Option<&str>) -> Result<Vec<CredentialInfo>> {
     Ok(read(filter)?
         .iter()
@@ -199,7 +199,7 @@ mod tests {
 
     #[test]
     fn write_read_delete() {
-        let target = "acct-selftest:credman:1";
+        let target = "acswi-selftest:credman:1";
         let cred = Credential {
             target: target.into(),
             user: "tester".into(),
@@ -212,7 +212,7 @@ mod tests {
             last_written: 0,
         };
         write(&cred).unwrap();
-        let got = read(Some("acct-selftest:credman:*")).unwrap();
+        let got = read(Some("acswi-selftest:credman:*")).unwrap();
         assert_eq!(got.len(), 1);
         assert_eq!(got[0].blob, b"not-a-real-secret");
         assert_eq!(got[0].user, "tester");

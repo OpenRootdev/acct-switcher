@@ -3,8 +3,8 @@
 use std::os::windows::process::CommandExt;
 use std::process::Command;
 
-use acct_core::engine::{Acct, Actor, AddStep, AppView, SwitchOptions, SwitchReport};
-use acct_core::{Code, Error};
+use acswi_core::engine::{Acswi, Actor, AddStep, AppView, SwitchOptions, SwitchReport};
+use acswi_core::{Code, Error};
 use serde::Serialize;
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -34,7 +34,7 @@ struct ConfirmClose {
 }
 
 fn changed(handle: &AppHandle, app: &str, message: Option<String>, error: Option<Error>) {
-    let _ = handle.emit("acct://changed", Changed { app: app.into(), message, error });
+    let _ = handle.emit("acswi://changed", Changed { app: app.into(), message, error });
     refresh_tray(handle.clone());
 }
 
@@ -42,7 +42,7 @@ fn changed(handle: &AppHandle, app: &str, message: Option<String>, error: Option
 
 #[tauri::command(async)]
 fn overview(all: bool) -> Result<Vec<AppView>, Error> {
-    Ok(Acct::open()?
+    Ok(Acswi::open()?
         .overview(None)?
         .into_iter()
         .filter(|v| all || v.installed || !v.profiles.is_empty())
@@ -51,62 +51,62 @@ fn overview(all: bool) -> Result<Vec<AppView>, Error> {
 
 #[tauri::command(async)]
 fn switch_profile(handle: AppHandle, app: String, profile: String, close: bool) -> Result<SwitchReport, Error> {
-    let report = Acct::open()?.switch(&app, &profile, &opts(close))?;
+    let report = Acswi::open()?.switch(&app, &profile, &opts(close))?;
     refresh_tray(handle);
     Ok(report)
 }
 
 #[tauri::command(async)]
 fn save_current(handle: AppHandle, app: String, profile: String) -> Result<(), Error> {
-    Acct::open()?.save(&app, &profile, Actor::Ui)?;
+    Acswi::open()?.save(&app, &profile, Actor::Ui)?;
     refresh_tray(handle);
     Ok(())
 }
 
 #[tauri::command(async)]
 fn refresh_saved(app: String) -> Result<Option<String>, Error> {
-    Acct::open()?.refresh(&app)
+    Acswi::open()?.refresh(&app)
 }
 
 #[tauri::command(async)]
 fn rename_profile(handle: AppHandle, app: String, old: String, new: String) -> Result<(), Error> {
-    Acct::open()?.rename(&app, &old, &new)?;
+    Acswi::open()?.rename(&app, &old, &new)?;
     refresh_tray(handle);
     Ok(())
 }
 
 #[tauri::command(async)]
 fn remove_profile(handle: AppHandle, app: String, profile: String) -> Result<(), Error> {
-    Acct::open()?.remove(&app, &profile, Actor::Ui)?;
+    Acswi::open()?.remove(&app, &profile, Actor::Ui)?;
     refresh_tray(handle);
     Ok(())
 }
 
 /// Starts adding an account. Sign-in commands (gh auth login, …) need a terminal, so they
 /// run in their own console window; when it closes the account is saved automatically and
-/// `acct://changed` is emitted.
+/// `acswi://changed` is emitted.
 #[tauri::command(async)]
 fn add_begin(handle: AppHandle, app: String, profile: String, close: bool) -> Result<AddStep, Error> {
-    let acct = Acct::open()?;
-    let step = acct.add_begin(&app, &profile, &opts(close))?;
+    let acswi = Acswi::open()?;
+    let step = acswi.add_begin(&app, &profile, &opts(close))?;
     if let AddStep::RunLogin { command, env } = &step {
         let (command, env) = (command.clone(), env.clone());
         std::thread::spawn(move || {
             let result = run_in_console(&command, &env);
-            let acct = match Acct::open() {
+            let acswi = match Acswi::open() {
                 Ok(a) => a,
                 Err(e) => return changed(&handle, &app, None, Some(e)),
             };
             match result {
-                Ok(true) => match acct.add_finish(&app, &opts(true)) {
+                Ok(true) => match acswi.add_finish(&app, &opts(true)) {
                     Ok(p) => changed(&handle, &app, Some(format!("Added {p}")), None),
                     Err(e) => {
-                        let _ = acct.add_cancel(&app, &opts(true));
+                        let _ = acswi.add_cancel(&app, &opts(true));
                         changed(&handle, &app, None, Some(e))
                     }
                 },
                 Ok(false) | Err(_) => {
-                    let _ = acct.add_cancel(&app, &opts(true));
+                    let _ = acswi.add_cancel(&app, &opts(true));
                     let err = result.err().unwrap_or_else(|| Error::new(Code::CommandFailed, "Sign-in was not completed"));
                     changed(&handle, &app, None, Some(err))
                 }
@@ -118,22 +118,22 @@ fn add_begin(handle: AppHandle, app: String, profile: String, close: bool) -> Re
 
 #[tauri::command(async)]
 fn add_finish(handle: AppHandle, app: String) -> Result<String, Error> {
-    let p = Acct::open()?.add_finish(&app, &opts(true))?;
+    let p = Acswi::open()?.add_finish(&app, &opts(true))?;
     refresh_tray(handle);
     Ok(p)
 }
 
 #[tauri::command(async)]
 fn add_cancel(handle: AppHandle, app: String) -> Result<Option<String>, Error> {
-    let back = Acct::open()?.add_cancel(&app, &opts(true))?;
+    let back = Acswi::open()?.add_cancel(&app, &opts(true))?;
     refresh_tray(handle);
     Ok(back)
 }
 
 #[tauri::command]
 fn open_apps_folder() -> Result<(), Error> {
-    let acct = Acct::open()?;
-    let dir = &acct.paths.user_defs;
+    let acswi = Acswi::open()?;
+    let dir = &acswi.paths.user_defs;
     std::fs::create_dir_all(dir).map_err(|e| Error::io(dir.display(), e))?;
     Command::new("explorer.exe").arg(dir).spawn().map_err(|e| Error::io("explorer", e))?;
     Ok(())
@@ -141,7 +141,7 @@ fn open_apps_folder() -> Result<(), Error> {
 
 fn run_in_console(command: &[String], env: &[(String, String)]) -> Result<bool, Error> {
     let Some((prog, args)) = command.split_first() else { return Ok(true) };
-    let path = acct_core::paths::which(prog)
+    let path = acswi_core::paths::which(prog)
         .ok_or_else(|| Error::new(Code::NotInstalled, format!("{prog} was not found on PATH")))?;
     let status = Command::new(path)
         .args(args)
@@ -164,7 +164,7 @@ fn show_main(handle: &AppHandle) {
 
 fn build_menu(handle: &AppHandle, views: &[AppView]) -> tauri::Result<Menu<Wry>> {
     let menu = Menu::new(handle)?;
-    menu.append(&MenuItem::with_id(handle, "open", "Open acct", true, None::<&str>)?)?;
+    menu.append(&MenuItem::with_id(handle, "open", "Open Account Switcher", true, None::<&str>)?)?;
     menu.append(&PredefinedMenuItem::separator(handle)?)?;
     let mut any = false;
     for v in views.iter().filter(|v| v.installed && !v.profiles.is_empty()) {
@@ -187,7 +187,7 @@ fn build_menu(handle: &AppHandle, views: &[AppView]) -> tauri::Result<Menu<Wry>>
 /// Rebuilds the tray menu in the background (listing apps can take a second).
 fn refresh_tray(handle: AppHandle) {
     std::thread::spawn(move || {
-        let views = Acct::open().and_then(|a| a.overview(None)).unwrap_or_default();
+        let views = Acswi::open().and_then(|a| a.overview(None)).unwrap_or_default();
         if let (Ok(menu), Some(tray)) = (build_menu(&handle, &views), handle.tray_by_id("main")) {
             let _ = tray.set_menu(Some(menu));
         }
@@ -196,13 +196,13 @@ fn refresh_tray(handle: AppHandle) {
 
 fn tray_switch(handle: AppHandle, app: String, profile: String) {
     std::thread::spawn(move || {
-        let result = Acct::open().and_then(|a| a.switch(&app, &profile, &opts(false)));
+        let result = Acswi::open().and_then(|a| a.switch(&app, &profile, &opts(false)));
         match result {
             Ok(r) => changed(&handle, &app, Some(format!("Switched to {}", r.to)), None),
             Err(e) if e.code == Code::AppRunning => {
-                let name = Acct::open().ok().and_then(|a| a.def(&app).ok().map(|d| d.name.clone())).unwrap_or(app.clone());
+                let name = Acswi::open().ok().and_then(|a| a.def(&app).ok().map(|d| d.name.clone())).unwrap_or(app.clone());
                 show_main(&handle);
-                let _ = handle.emit("acct://confirm-close", ConfirmClose { app, name, profile });
+                let _ = handle.emit("acswi://confirm-close", ConfirmClose { app, name, profile });
                 refresh_tray(handle);
             }
             Err(e) => {
@@ -234,7 +234,7 @@ fn main() {
             let menu = build_menu(&handle, &[])?;
             TrayIconBuilder::with_id("main")
                 .icon(app.default_window_icon().cloned().expect("icon"))
-                .tooltip("acct — accounts")
+                .tooltip("Account Switcher")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|handle, event| {
@@ -263,12 +263,12 @@ fn main() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            // Closing the window keeps acct in the tray.
+            // Closing the window keeps acswi in the tray.
             if let WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
                 let _ = window.hide();
             }
         })
         .run(tauri::generate_context!())
-        .expect("acct failed to start");
+        .expect("acswi failed to start");
 }

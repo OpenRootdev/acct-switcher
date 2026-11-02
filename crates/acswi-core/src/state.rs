@@ -28,7 +28,7 @@ pub struct AppState {
     pub active: Option<String>,
     #[serde(default)]
     pub profiles: BTreeMap<String, Profile>,
-    /// A sign-in started with `acct add` that has not been finished or cancelled.
+    /// A sign-in started with `acswi add` that has not been finished or cancelled.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pending: Option<PendingAdd>,
 }
