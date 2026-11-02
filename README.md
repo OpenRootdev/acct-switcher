@@ -1,190 +1,73 @@
-# acct
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Ker102/acct-switcher/assets/logo.svg" width="104" alt="acct logo">
+</p>
 
-Keep several signed-in accounts for an app or CLI on one Windows PC and switch which one
-it uses, without signing in again. One account at a time per app; this is not for running
-two accounts side by side.
+<h1 align="center">acct</h1>
 
-- **`acct`**: a small command-line tool. Readable for people, `--json` for scripts and AI agents.
-- **acct desktop app**: a window and a tray menu. Click an account to switch.
-- **Generic**: every app is described by a short TOML file. acct ships with a few; add your
-  own by hand or with `acct learn`.
+<p align="center">
+  Sign in to each of your accounts once, then switch any app between them in one click.<br>
+  <sub>For people with several accounts in the same CLI or desktop app on Windows: work and personal, clients, test accounts.</sub>
+</p>
 
-## Use it
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Ker102/acct-switcher/assets/preview.gif" width="760" alt="The acct window switching Codex from a personal to a work account with one click">
+</p>
 
-```
-acct                         show every app and its accounts
-acct gh work                 switch GitHub CLI to "work"   (same as: acct use gh work)
-acct add discord personal    sign in a new Discord account and save it as "personal"
-acct add az work -- --tenant contoso.onmicrosoft.com
-                             options after -- go to the app's sign-in command
-acct save claude me          save the account Claude Code is signed in to now as "me"
-acct save claude             update the saved copy of the active account
-acct rename az KristoferJussmann@corp.onmicrosoft.com work
-acct status                  who each app is signed in as right now
-acct remove discord old      delete a saved account
-acct apps                    which apps acct knows
-acct learn slack             teach acct a new app (see below)
-acct doctor                  check the setup, finish an interrupted switch
-```
+<p align="center">
+  <a href="https://github.com/Ker102/acct-switcher/releases/latest/download/acct-windows-x64.zip"><b>Download for Windows</b></a> &nbsp;·&nbsp; <a href="#get-started">Get started</a> &nbsp;·&nbsp; <a href="docs/usage.md">Docs</a>
+</p>
 
-If the app is open, acct asks before closing it (`--close` skips the question) and reopens it
-afterwards.
+<p align="center">
+  <sub>Works with</sub><br>
+  <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Ker102/acct-switcher/assets/brands/github-dark.svg"><img src="https://raw.githubusercontent.com/Ker102/acct-switcher/assets/brands/github.svg" height="16" alt=""></picture>&nbsp;GitHub CLI &amp; Desktop &nbsp;·&nbsp; <img src="https://raw.githubusercontent.com/Ker102/acct-switcher/assets/brands/claude.svg" height="16" alt="">&nbsp;Claude Code &nbsp;·&nbsp; <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Ker102/acct-switcher/assets/brands/openai-dark.svg"><img src="https://raw.githubusercontent.com/Ker102/acct-switcher/assets/brands/openai.svg" height="16" alt=""></picture>&nbsp;Codex &nbsp;·&nbsp; <img src="https://raw.githubusercontent.com/Ker102/acct-switcher/assets/brands/discord.svg" height="16" alt="">&nbsp;Discord
+</p>
 
-### For scripts and AI agents
+## What it does
 
-Add `--json` to any command. Output is always `{"ok": true, "data": …}` or
-`{"ok": false, "error": {"code": "…", "message": "…"}}`.
+acct keeps a saved sign-in for every account you use in an app. Pick one in the window, the tray or the terminal, and the app is signed in to it, with no password or browser sign-in.
 
-| exit | code | meaning |
-|---|---|---|
-| 0 | | done |
-| 3 | `app_running` | the app is open; retry with `--close` if closing it is fine |
-| 4 | `needs_human` | signing in needs a person (`add`, `learn`) |
-| 5 | `unknown_app`, `unknown_profile` | `details.profiles` lists the valid names |
-| 6 | `unsaved_session`, `identity_mismatch` | the live account is not the one acct expected; nothing was changed |
-| 1 | anything else | see `error.message` |
+- Works with command-line tools and desktop apps. GitHub CLI, Azure CLI, Claude Code, Codex, GitHub Desktop and Discord are built in; any other app can be added with a short file.
+- Saved sign-ins stay on your PC, encrypted for your Windows user.
+- Scripts and AI agents can switch accounts by name, and never see a password or token.
 
-Agents switch by profile name (`acct use gh work --json`). There is no command that prints a
-token, and `add`/`learn` refuse to run without a terminal.
+> [!NOTE]
+> Early version. Switching GitHub CLI, Azure CLI and Discord is tested on real accounts; the other built-in apps so far only in automated tests.
 
-## What ships
+## How it's different
 
-| app | how acct switches it |
-|---|---|
-| GitHub CLI (`gh`) | its own account list (`gh auth switch`) |
-| Azure CLI (`az`) | its own account list (`az account set`); profile = user |
-| Claude Code (`claude`) | swaps `~/.claude/.credentials.json` and the `oauthAccount` entry in `~/.claude.json` |
-| Codex CLI (`codex`) | swaps `~/.codex/auth.json` |
-| GitHub Desktop | swaps its Credential Manager entries and its `Local Storage` folder |
-| Discord | swaps its `Local Storage` folder |
+Most account switchers cover one app, usually Codex or Claude Code. [TcNo Account Switcher](https://github.com/TCNOco/TcNo-Acc-Switcher) covers many, mostly game launchers like Steam, Battle.net and Epic, and is the better pick for those. acct is made for the tools you work with:
 
-## Add an app
+- One place for command-line tools and desktop apps.
+- When an app already keeps several accounts (GitHub CLI, Azure CLI), acct uses that instead of copying files.
+- `acct learn` watches an app while you sign in and writes its definition for you.
 
-Put a `.toml` file in `%APPDATA%\acct\apps\` (the desktop app's … menu opens the folder).
-Your files override the built-in ones with the same `id`.
+## Get started
 
-```toml
-id = "slack"
-name = "Slack"
-strategy = "swap"                       # swap | native | env
-detect = ['%LOCALAPPDATA%\slack\slack.exe']
-processes = ["slack.exe"]                # closed before swapping
-launch = ['%LOCALAPPDATA%\slack\slack.exe']
-# login = ["tool", "login"]             # CLI tools: how to sign in a new account
-# login_env = { TOOL_NO_PROMPT = "1" }  # environment for the sign-in command only
+1. Download <a href="https://github.com/Ker102/acct-switcher/releases/latest/download/acct-windows-x64.zip">acct-windows-x64.zip</a> and unzip it into a folder on your <code>PATH</code>.
+2. Open <code>acct-desktop</code> for the window and tray menu, or type <code>acct</code> in a terminal.
+3. Add a second account to an app. acct saves the one you're signed in to now, then lets you sign in the new one. After that, <code>acct</code> lists your accounts and you type a number to switch:
 
-[identity]                               # optional; who is signed in (never a secret)
-command = ["tool", "whoami", "--json"]
-pointer = "/email"
-
-[[state]]
-kind = "dir"
-path = '%APPDATA%\Slack\Network'
-mode = "move"
-
-[[state]]
-kind = "dir"
-path = '%APPDATA%\Slack\Local Storage'
-mode = "move"
+```bash
+acct add codex
+acct
 ```
 
-State kinds:
+## What you need
 
-| kind | fields | saved as |
-|---|---|---|
-| `file` | `path` | encrypted copy |
-| `dir` | `path`, `mode = "encrypt"` (default) or `"move"`, `exclude = ["*.log"]` | `encrypt`: files packed into the encrypted vault, excluded files stay shared. `move`: the folder is moved aside as-is (for big app folders) |
-| `credential` | `pattern` (Credential Manager target, `*`/`?` allowed) | encrypted copy |
-| `registry` | `key` under HKCU | encrypted copy |
-| `json_key` | `path`, `keys = ["/oauthAccount"]` (JSON pointers) | only those keys; the rest of the file is left alone |
+- Windows 11. Windows 10 with the WebView2 runtime should work but is not tested.
+- The apps you want to switch, each signed in once through acct.
+- To build it yourself instead: Rust and the Visual Studio C++ build tools (<a href="docs/usage.md#build-from-source">how</a>).
 
-Other strategies:
+## What's inside
 
-```toml
-strategy = "native"         # the app keeps several accounts itself
-[native]
-list = ["tool", "accounts", "--json"]    # or list_file = "~/.tool/accounts.json"
-items = "/accounts"                      # pointer to the array ("" = root)
-account = "/email"                       # label per item
-active = "/current"                      # boolean per item
-value = "/id"                            # passed to switch as {value} (default: label)
-switch = ["tool", "use", "{value}"]
+- [`apps/acct-desktop/`](apps/acct-desktop/) · The window and tray menu.
+- [`crates/acct-cli/`](crates/acct-cli/) · The <code>acct</code> command.
+- [`crates/acct-core/`](crates/acct-core/) · Saves, encrypts and restores sign-ins; shared by both.
+- [`defs/`](defs/) · The built-in apps, one short file each.
+- [`docs/`](docs/) · Commands, adding an app, and how switching works.
 
-strategy = "env"            # one config folder per profile, picked by a user variable
-[env]
-var = "TOOL_CONFIG_DIR"     # only programs started after the switch see it
-```
+<sub>Preview images live on the <a href="https://github.com/Ker102/acct-switcher/tree/assets"><code>assets</code></a> branch, so <code>main</code> holds only the tool.</sub>
 
-### `acct learn`
+---
 
-If you don't know where an app keeps its sign-in:
-
-```
-acct learn slack
-```
-
-acct looks for folders named like the app in AppData and your home folder, asks you to close
-the app, sign in, and close it again, then shows what changed (files, Electron session
-folders, Credential Manager entries). It writes a draft definition for you to check before
-saving. Remove anything that is not sign-in data. A `Cache` folder in a profile only costs space;
-a settings file means settings switch with the account.
-
-## How a switch works
-
-1. acct takes a lock, so the CLI, the app and agents never switch at the same time.
-2. If the app is running it is asked to close, then force-closed after 6 seconds (many
-   Electron apps only hide to the tray).
-3. The live sign-in is **saved back into the active profile first**. Apps that rotate refresh
-   tokens (Claude Code, Codex, most OAuth apps) keep working because the newest token is what
-   gets stored. If the app reports a different account than the profile expects, acct stops
-   and changes nothing.
-4. The live state is cleared and the target profile is restored. Each step is journaled; if
-   the PC dies halfway, the next acct command finishes or undoes it.
-5. The app is reopened if it was open.
-
-## Security
-
-- Saved sign-ins are encrypted with Windows DPAPI for your user on this PC, plus a random
-  per-install key in `%LOCALAPPDATA%\acct\entropy`. Copying the vault to another PC or user
-  does not decrypt it.
-- Secrets are wiped from memory after use. `state.json` and `audit.log` hold names and
-  account labels only.
-- acct never prints a token, and the JSON output has no secret fields.
-- Limit: anything running as you can still decrypt DPAPI data or ask a CLI for its token
-  (`gh auth token`). That is the same protection the apps themselves give their tokens. It
-  is not a sandbox against your own processes. To keep an AI agent away from tokens, also deny
-  it those commands, e.g. in Claude Code settings:
-  `"deny": ["Read(~/AppData/Local/acct/**)", "Bash(gh auth token*)"]`.
-
-## Limits
-
-| case | examples | what works |
-|---|---|---|
-| Device-bound tokens (Microsoft WAM / Primary Refresh Token) | Office, new Teams, OneDrive, az on Windows | can't be copied. acct only selects among accounts the system already holds (az); use the app's own account switcher for Office/Teams |
-| Electron `safeStorage` | Discord, Slack, Notion, GitHub Desktop, VS Code | works on this PC under this Windows user; profiles can't move to another PC |
-| Rotating refresh tokens | Claude Code, Codex, many OAuth apps | fine while acct does the switching. Don't restore an old copy by hand, and don't use the same profile on two PCs |
-| Chrome/Edge app-bound cookies | browsers | not supported; use browser profiles |
-| Store (MSIX) apps | apps under `%LOCALAPPDATA%\Packages` | possible with a definition, not tested |
-| Apps open while switching | any | acct always closes them first; a running app would overwrite the swap |
-
-Claude desktop app sessions sign in through the desktop app, not `~/.claude/.credentials.json`,
-so switching Claude Code does not affect them.
-
-## Build
-
-Needs Rust (stable, MSVC) and the Visual Studio C++ build tools. WebView2 is part of Windows 11.
-
-```
-cargo build --release
-```
-
-Produces `target\release\acct.exe` (CLI) and `target\release\acct-desktop.exe` (window and tray;
-start with `--hidden` to go straight to the tray). Put both on your `PATH` or in a folder of
-your choice.
-
-Data lives in `%LOCALAPPDATA%\acct` (`ACCT_HOME` overrides it, e.g. for tests).
-
-Tests: `cargo test -p acct-core` (uses real DPAPI and Credential Manager under a
-temporary folder; it creates and deletes `acct-selftest*` credentials).
-
-Design notes: [docs/DESIGN.md](docs/DESIGN.md).
+<sub>MIT licence · <a href="https://github.com/Ker102">Ker102</a></sub>

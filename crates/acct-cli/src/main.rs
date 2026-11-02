@@ -14,13 +14,12 @@ const GREEN: Style = AnsiColor::Green.on_default();
 const YELLOW: Style = AnsiColor::Yellow.on_default();
 const RED: Style = AnsiColor::Red.on_default();
 
-/// Switch which account an app or CLI uses, without signing in again.
+/// Switch which account an app uses, without signing in again.
 ///
-/// Examples:
-///   acct                      show every app and its accounts
-///   acct gh work              switch GitHub CLI to the profile "work"
-///   acct add discord personal sign in a new Discord account and save it
-///   acct save claude me       save the account Claude Code is signed in to now
+///   acct                  pick an account from a list
+///   acct discord          Discord's accounts; pick one
+///   acct discord work     switch Discord to "work"
+///   acct add discord      sign in another Discord account and save it
 #[derive(Parser)]
 #[command(name = "acct", version, verbatim_doc_comment, disable_help_subcommand = true)]
 struct Cli {
@@ -72,8 +71,7 @@ enum Cmd {
     /// Sign in a new account and save it as a profile
     Add {
         app: String,
-        /// Name for the new profile (not needed with --finish or --cancel)
-        #[arg(required_unless_present_any = ["finish", "cancel"])]
+        /// Name for the new account (asked for if left out)
         profile: Option<String>,
         /// Close the app if it is open
         #[arg(long)]
@@ -222,6 +220,7 @@ fn main() -> ExitCode {
 
 fn run(ctx: &Ctx, cmd: Option<Cmd>, shortcut_close: bool) -> Result<(), Error> {
     match cmd {
+        None if ctx.interactive() => menu(ctx, None),
         None => list(ctx, None, false),
         Some(Cmd::List { app, all }) => list(ctx, app.as_deref(), all),
         Some(Cmd::Use { app, profile, close, no_relaunch, force }) => use_profile(ctx, &app, &profile, close, !no_relaunch, force),
@@ -253,6 +252,7 @@ fn run(ctx: &Ctx, cmd: Option<Cmd>, shortcut_close: bool) -> Result<(), Error> {
         Some(Cmd::Learn { id, name, hint }) => learn_app(ctx, &id, name, hint),
         Some(Cmd::Doctor) => doctor(ctx),
         Some(Cmd::Shortcut(args)) => match args.as_slice() {
+            [app] if ctx.interactive() => menu(ctx, Some(app)),
             [app] => list(ctx, Some(app), true),
             [app, profile] => use_profile(ctx, app, profile, shortcut_close, true, false),
             _ => Err(Error::new(Code::InvalidName, "Usage: acct <app> [profile]. Run `acct --help` for all commands.")),
@@ -276,13 +276,14 @@ fn list(ctx: &Ctx, app: Option<&str>, all: bool) -> Result<(), Error> {
             if i > 0 {
                 println!();
             }
-            print_app(v);
+            print_app(v, None);
         }
     });
     Ok(())
 }
 
-fn print_app(v: &AppView) {
+/// Prints one app and its accounts; with `first`, accounts are numbered from it for the menu.
+fn print_app(v: &AppView, first: Option<usize>) {
     let mut tags = Vec::new();
     if !v.installed {
         tags.push(format!("{YELLOW}not installed{YELLOW:#}"));
@@ -296,24 +297,86 @@ fn print_app(v: &AppView) {
         println!("  {YELLOW}!{YELLOW:#} {w}");
     }
     if let Some(p) = &v.pending_add {
-        println!("  {YELLOW}!{YELLOW:#} adding {p:?} is not finished: acct add {} {p} --finish (or --cancel)", v.id);
+        println!("  {YELLOW}!{YELLOW:#} adding {p:?} is not finished: acct add {} --finish (or --cancel)", v.id);
     }
     if v.profiles.is_empty() {
-        let hint = match v.strategy {
-            Strategy::Swap => format!("acct save {} <name>  or  acct add {} <name>", v.id, v.id),
-            _ => format!("acct add {} <name>", v.id),
-        };
+        let hint = if first.is_some() { "type a to add one".to_string() } else { format!("acct add {}", v.id) };
         println!("  {DIM}no accounts yet · {hint}{DIM:#}");
         return;
     }
     let width = v.profiles.iter().map(|p| p.name.len()).max().unwrap_or(0);
-    for p in &v.profiles {
+    for (i, p) in v.profiles.iter().enumerate() {
+        let num = first.map(|f| format!("{DIM}{:>2}{DIM:#} ", f + i)).unwrap_or_default();
         let mark = if p.active { format!("{GREEN}●{GREEN:#}") } else { " ".into() };
         let ident = match &p.identity {
             Some(i) if i != &p.name => i.as_str(),
             _ => "",
         };
-        println!("  {mark} {:<width$}  {DIM}{ident}{DIM:#}", p.name);
+        println!("  {num}{mark} {:<width$}  {DIM}{ident}{DIM:#}", p.name);
+    }
+}
+
+/// `acct` or `acct <app>` in a terminal: numbered accounts, then switch or add by typing.
+fn menu(ctx: &Ctx, app: Option<&str>) -> Result<(), Error> {
+    let views: Vec<AppView> = ctx
+        .acct
+        .overview(app)?
+        .into_iter()
+        .filter(|v| app.is_some() || v.installed || !v.profiles.is_empty())
+        .collect();
+    if views.is_empty() {
+        println!("No apps found. Run `acct apps` to see what acct can switch.");
+        return Ok(());
+    }
+    let mut choices: Vec<(&str, &str)> = Vec::new();
+    for (i, v) in views.iter().enumerate() {
+        if i > 0 {
+            println!();
+        }
+        print_app(v, Some(choices.len() + 1));
+        choices.extend(v.profiles.iter().map(|p| (v.id.as_str(), p.name.as_str())));
+    }
+    println!();
+    let prompt = match choices.len() {
+        0 => "Type a to add an account, or press Enter to quit: ".to_string(),
+        1 => "Type 1 to switch, a to add an account, or press Enter to quit: ".to_string(),
+        n => format!("Type 1-{n} to switch, a to add an account, or press Enter to quit: "),
+    };
+    loop {
+        let answer = ask(&prompt);
+        if answer.is_empty() {
+            return Ok(());
+        }
+        if answer.eq_ignore_ascii_case("a") {
+            let target = match views.as_slice() {
+                [only] => only.id.clone(),
+                _ => match pick_app(&views) {
+                    Some(id) => id,
+                    None => return Ok(()),
+                },
+            };
+            return add(ctx, &target, None, false, false, false, &[]);
+        }
+        match answer.parse::<usize>().ok().and_then(|n| n.checked_sub(1)).and_then(|i| choices.get(i)) {
+            Some((app, profile)) => return use_profile(ctx, app, profile, false, true, false),
+            None => println!("{DIM}Type one of the numbers above, a, or press Enter.{DIM:#}"),
+        }
+    }
+}
+
+fn pick_app(views: &[AppView]) -> Option<String> {
+    let installed: Vec<&AppView> = views.iter().filter(|v| v.installed).collect();
+    for (i, v) in installed.iter().enumerate() {
+        println!("  {DIM}{:>2}{DIM:#} {}", i + 1, v.name);
+    }
+    loop {
+        let answer = ask("Add an account to which app? (number, or Enter to go back): ");
+        if answer.is_empty() {
+            return None;
+        }
+        if let Some(v) = answer.parse::<usize>().ok().and_then(|n| n.checked_sub(1)).and_then(|i| installed.get(i)) {
+            return Some(v.id.clone());
+        }
     }
 }
 
@@ -483,9 +546,22 @@ fn add(
         });
         return Ok(());
     }
-    let profile = profile.expect("clap requires a profile without --finish or --cancel");
     ctx.require_human("Signing in a new account")?;
     let def = ctx.acct.def(app)?.clone();
+    let asked;
+    let profile = match profile {
+        Some(p) => p,
+        None => {
+            asked = loop {
+                let name = ask(&format!("Name for the new {} account (e.g. work): ", def.name));
+                if acct_core::paths::valid_name(&name) {
+                    break name;
+                }
+                println!("{DIM}Use letters, digits, dots, dashes or underscores.{DIM:#}");
+            };
+            asked.as_str()
+        }
+    };
     let mut opts = opts;
     let step = loop {
         match ctx.acct.add_begin(app, profile, &opts) {
@@ -513,8 +589,7 @@ fn add(
                     format!("Sign-in did not finish.{}", back.map(|b| format!(" Back to {b}.")).unwrap_or_default()),
                 ));
             }
-            let p = ctx.acct.add_finish(app, &opts)?;
-            println!("{GREEN}✓{GREEN:#} Added {BOLD}{p}{BOLD:#}; it is now active.");
+            finish_add(ctx, app, profile, &opts)?;
         }
         AddStep::SignInApp => {
             println!("{} is opening with no account signed in.", def.name);
@@ -524,9 +599,24 @@ fn add(
                 println!("Cancelled.{}", back.map(|b| format!(" Back to {b}.")).unwrap_or_default());
                 return Ok(());
             }
-            let p = ctx.acct.add_finish(app, &opts)?;
-            println!("{GREEN}✓{GREEN:#} Added {BOLD}{p}{BOLD:#}; it is now active.");
+            finish_add(ctx, app, profile, &opts)?;
         }
+    }
+    Ok(())
+}
+
+/// Finishes an add, accepting that it may already have been finished elsewhere (the desktop app).
+fn finish_add(ctx: &Ctx, app: &str, profile: &str, opts: &SwitchOptions) -> Result<(), Error> {
+    match ctx.acct.add_finish(app, opts) {
+        Ok(p) => println!("{GREEN}✓{GREEN:#} Added {BOLD}{p}{BOLD:#}; it is now active."),
+        Err(e) if e.code == Code::UnknownProfile => {
+            let added = ctx.acct.overview(Some(app))?.iter().any(|v| v.profiles.iter().any(|p| p.name == profile));
+            if !added {
+                return Err(e);
+            }
+            println!("{GREEN}✓{GREEN:#} {BOLD}{profile}{BOLD:#} was already added (finished in the desktop app).");
+        }
+        Err(e) => return Err(e),
     }
     Ok(())
 }
