@@ -113,6 +113,11 @@ pub enum AddStep {
     Done { profile: String },
 }
 
+fn login_env(def: &AppDef, mut env: Vec<(String, String)>) -> Vec<(String, String)> {
+    env.extend(def.login_env.iter().map(|(k, v)| (k.clone(), v.clone())));
+    env
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 struct Journal {
     app: String,
@@ -720,7 +725,7 @@ impl Acct {
                 let before: Vec<String> = self.native_accounts(&def)?.into_iter().map(|a| a.account).collect();
                 app_state.pending = Some(PendingAdd { profile: profile.into(), previous: Some(before.join("\n")), started: Utc::now() });
                 self.save_state(&state)?;
-                Ok(AddStep::RunLogin { command: def.login.clone(), env: vec![] })
+                Ok(AddStep::RunLogin { command: def.login.clone(), env: login_env(&def, vec![]) })
             }
             Strategy::Env => {
                 let spec = def.env.as_ref().unwrap();
@@ -730,7 +735,7 @@ impl Acct {
                 self.save_state(&state)?;
                 Ok(AddStep::RunLogin {
                     command: def.login.clone(),
-                    env: vec![(spec.var.clone(), dir.to_string_lossy().into_owned())],
+                    env: login_env(&def, vec![(spec.var.clone(), dir.to_string_lossy().into_owned())]),
                 })
             }
             Strategy::Swap => {
@@ -750,7 +755,7 @@ impl Acct {
                     process::launch(&def.launch)?;
                     Ok(AddStep::SignInApp)
                 } else {
-                    Ok(AddStep::RunLogin { command: def.login.clone(), env: vec![] })
+                    Ok(AddStep::RunLogin { command: def.login.clone(), env: login_env(&def, vec![]) })
                 }
             }
         }
@@ -770,11 +775,16 @@ impl Acct {
             Strategy::Native => {
                 let before: Vec<&str> = pending.previous.as_deref().unwrap_or("").lines().collect();
                 let accounts = self.native_accounts(&def)?;
-                let new = accounts
-                    .iter()
-                    .find(|a| !before.contains(&a.account.as_str()))
-                    .or_else(|| accounts.iter().find(|a| a.active))
-                    .ok_or_else(|| Error::new(Code::CommandFailed, format!("No new {} account was found", def.name)))?;
+                let Some(new) = accounts.iter().find(|a| !before.contains(&a.account.as_str())) else {
+                    // Signing in to an account the app already had is not an add; keep the
+                    // pending add so the person can sign in to a different one and retry.
+                    let active = accounts.iter().find(|a| a.active).map(|a| a.account.as_str()).unwrap_or("an existing account");
+                    bail!(
+                        CommandFailed,
+                        "{} is still signed in to {active}, which acct already has. Sign in to a different account, then finish again (or cancel).",
+                        def.name
+                    );
+                };
                 let app_state = state.app_mut(&def.id);
                 app_state.profiles.retain(|_, p| p.account.as_deref() != Some(&new.account));
                 let mut p = Profile::new();

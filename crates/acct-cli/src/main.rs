@@ -72,7 +72,9 @@ enum Cmd {
     /// Sign in a new account and save it as a profile
     Add {
         app: String,
-        profile: String,
+        /// Name for the new profile (not needed with --finish or --cancel)
+        #[arg(required_unless_present_any = ["finish", "cancel"])]
+        profile: Option<String>,
         /// Close the app if it is open
         #[arg(long)]
         close: bool,
@@ -82,6 +84,10 @@ enum Cmd {
         /// Cancel an unfinished add and go back to the previous account
         #[arg(long)]
         cancel: bool,
+        /// Extra options for the app's sign-in command, after `--`
+        /// (e.g. `acct add az work -- --tenant contoso.onmicrosoft.com`)
+        #[arg(last = true)]
+        login_args: Vec<String>,
     },
     /// Save the account the app is signed in to now (or refresh the active profile's copy)
     Save { app: String, profile: Option<String> },
@@ -219,7 +225,9 @@ fn run(ctx: &Ctx, cmd: Option<Cmd>, shortcut_close: bool) -> Result<(), Error> {
         None => list(ctx, None, false),
         Some(Cmd::List { app, all }) => list(ctx, app.as_deref(), all),
         Some(Cmd::Use { app, profile, close, no_relaunch, force }) => use_profile(ctx, &app, &profile, close, !no_relaunch, force),
-        Some(Cmd::Add { app, profile, close, finish, cancel }) => add(ctx, &app, &profile, close, finish, cancel),
+        Some(Cmd::Add { app, profile, close, finish, cancel, login_args }) => {
+            add(ctx, &app, profile.as_deref(), close, finish, cancel, &login_args)
+        }
         Some(Cmd::Save { app, profile }) => save(ctx, &app, profile.as_deref()),
         Some(Cmd::Rename { app, old, new }) => {
             ctx.acct.rename(&app, &old, &new)?;
@@ -451,11 +459,19 @@ fn save(ctx: &Ctx, app: &str, profile: Option<&str>) -> Result<(), Error> {
     Ok(())
 }
 
-fn add(ctx: &Ctx, app: &str, profile: &str, close: bool, finish: bool, cancel: bool) -> Result<(), Error> {
+fn add(
+    ctx: &Ctx,
+    app: &str,
+    profile: Option<&str>,
+    close: bool,
+    finish: bool,
+    cancel: bool,
+    login_args: &[String],
+) -> Result<(), Error> {
     let opts = ctx.opts(close, true, false);
     if cancel {
         let back = ctx.acct.add_cancel(app, &opts)?;
-        ctx.emit(serde_json::json!({ "app": app, "cancelled": profile, "active": back }), |_| {
+        ctx.emit(serde_json::json!({ "app": app, "cancelled": true, "active": back }), |_| {
             println!("Cancelled.{}", back.as_deref().map(|b| format!(" Back to {b}.")).unwrap_or_default())
         });
         return Ok(());
@@ -467,6 +483,7 @@ fn add(ctx: &Ctx, app: &str, profile: &str, close: bool, finish: bool, cancel: b
         });
         return Ok(());
     }
+    let profile = profile.expect("clap requires a profile without --finish or --cancel");
     ctx.require_human("Signing in a new account")?;
     let def = ctx.acct.def(app)?.clone();
     let mut opts = opts;
@@ -485,7 +502,8 @@ fn add(ctx: &Ctx, app: &str, profile: &str, close: bool, finish: bool, cancel: b
     };
     match step {
         AddStep::Done { profile } => println!("{GREEN}✓{GREEN:#} Added {profile}."),
-        AddStep::RunLogin { command, env } => {
+        AddStep::RunLogin { mut command, env } => {
+            command.extend(login_args.iter().cloned());
             println!("{DIM}Signing in with: {}{DIM:#}", command.join(" "));
             let ok = acct_core::process::run_interactive(&command, &env)?;
             if !ok {

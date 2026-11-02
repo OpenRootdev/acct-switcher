@@ -15,6 +15,8 @@ two accounts side by side.
 acct                         show every app and its accounts
 acct gh work                 switch GitHub CLI to "work"   (same as: acct use gh work)
 acct add discord personal    sign in a new Discord account and save it as "personal"
+acct add az work -- --tenant contoso.onmicrosoft.com
+                             options after -- go to the app's sign-in command
 acct save claude me          save the account Claude Code is signed in to now as "me"
 acct save claude             update the saved copy of the active account
 acct rename az KristoferJussmann@corp.onmicrosoft.com work
@@ -69,6 +71,7 @@ detect = ['%LOCALAPPDATA%\slack\slack.exe']
 processes = ["slack.exe"]                # closed before swapping
 launch = ['%LOCALAPPDATA%\slack\slack.exe']
 # login = ["tool", "login"]             # CLI tools: how to sign in a new account
+# login_env = { TOOL_NO_PROMPT = "1" }  # environment for the sign-in command only
 
 [identity]                               # optional; who is signed in (never a secret)
 command = ["tool", "whoami", "--json"]

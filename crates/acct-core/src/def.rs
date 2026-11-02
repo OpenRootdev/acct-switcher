@@ -135,6 +135,9 @@ pub struct AppDef {
     /// Command that signs in a new account. Without it, acct opens the app and waits.
     #[serde(default)]
     pub login: Vec<String>,
+    /// Extra environment variables for the sign-in command only.
+    #[serde(default)]
+    pub login_env: std::collections::BTreeMap<String, String>,
     #[serde(default)]
     pub identity: Option<IdentitySpec>,
     #[serde(default)]

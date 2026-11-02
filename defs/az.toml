@@ -6,6 +6,9 @@ name = "Azure CLI"
 strategy = "native"
 detect = ["az"]
 login = ["az", "login", "--allow-no-subscriptions"]
+# az's interactive tenant/subscription picker waits for input and crashes on
+# tenants that need MFA; `acct add az NAME -- --tenant ID` signs in to one tenant.
+login_env = { AZURE_CORE_LOGIN_EXPERIENCE_V2 = "off" }
 notes = "A profile is a user; switching selects that user's first subscription."
 
 [native]
