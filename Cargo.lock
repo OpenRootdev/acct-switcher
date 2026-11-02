@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "acswi-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "acswi-core",
  "anstream 0.6.21",
@@ -17,7 +17,7 @@ dependencies = [
 
 [[package]]
 name = "acswi-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "getrandom 0.2.17",
@@ -36,7 +36,7 @@ dependencies = [
 
 [[package]]
 name = "acswi-desktop"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "acswi-core",
  "serde",
