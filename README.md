@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Ker102/acct-switcher/assets/logo.svg" width="104" alt="acct logo">
+  <img src="https://github.com/Ker102/acct-switcher/raw/assets/logo.svg" width="104" alt="acct logo">
 </p>
 
 <h1 align="center">acct</h1>
@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Ker102/acct-switcher/assets/preview.gif" width="760" alt="The acct window switching Codex from a personal to a work account with one click">
+  <img src="https://github.com/Ker102/acct-switcher/raw/assets/preview.gif" width="760" alt="The acct window switching Codex from a personal to a work account with one click">
 </p>
 
 <p align="center">
@@ -19,7 +19,7 @@
 
 <p align="center">
   <sub>Works with</sub><br>
-  <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Ker102/acct-switcher/assets/brands/github-dark.svg"><img src="https://raw.githubusercontent.com/Ker102/acct-switcher/assets/brands/github.svg" height="16" alt=""></picture>&nbsp;GitHub CLI &amp; Desktop &nbsp;·&nbsp; <img src="https://raw.githubusercontent.com/Ker102/acct-switcher/assets/brands/claude.svg" height="16" alt="">&nbsp;Claude Code &nbsp;·&nbsp; <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Ker102/acct-switcher/assets/brands/openai-dark.svg"><img src="https://raw.githubusercontent.com/Ker102/acct-switcher/assets/brands/openai.svg" height="16" alt=""></picture>&nbsp;Codex &nbsp;·&nbsp; <img src="https://raw.githubusercontent.com/Ker102/acct-switcher/assets/brands/discord.svg" height="16" alt="">&nbsp;Discord
+  <picture><source media="(prefers-color-scheme: dark)" srcset="https://github.com/Ker102/acct-switcher/raw/assets/brands/github-dark.svg"><img src="https://github.com/Ker102/acct-switcher/raw/assets/brands/github.svg" height="16" alt=""></picture>&nbsp;GitHub CLI &amp; Desktop &nbsp;·&nbsp; <img src="https://github.com/Ker102/acct-switcher/raw/assets/brands/claude.svg" height="16" alt="">&nbsp;Claude Code &nbsp;·&nbsp; <picture><source media="(prefers-color-scheme: dark)" srcset="https://github.com/Ker102/acct-switcher/raw/assets/brands/openai-dark.svg"><img src="https://github.com/Ker102/acct-switcher/raw/assets/brands/openai.svg" height="16" alt=""></picture>&nbsp;Codex &nbsp;·&nbsp; <img src="https://github.com/Ker102/acct-switcher/raw/assets/brands/discord.svg" height="16" alt="">&nbsp;Discord
 </p>
 
 ## What it does
