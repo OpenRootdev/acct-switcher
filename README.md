@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/Ker102/acct-switcher/raw/assets/logo.svg" width="104" alt="acct logo">
+  <img src="https://github.com/OpenRootdev/acct-switcher/raw/assets/logo.svg" width="104" alt="acct logo">
 </p>
 
 <h1 align="center">acct</h1>
@@ -10,16 +10,16 @@
 </p>
 
 <p align="center">
-  <img src="https://github.com/Ker102/acct-switcher/raw/assets/preview.gif" width="760" alt="The acct window switching Codex from a personal to a work account with one click">
+  <img src="https://github.com/OpenRootdev/acct-switcher/raw/assets/preview.gif" width="760" alt="The acct window switching Codex from a personal to a work account with one click">
 </p>
 
 <p align="center">
-  <a href="https://github.com/Ker102/acct-switcher/releases/latest/download/acct-windows-x64.zip"><b>Download for Windows</b></a> &nbsp;·&nbsp; <a href="#get-started">Get started</a> &nbsp;·&nbsp; <a href="docs/usage.md">Docs</a>
+  <a href="https://github.com/OpenRootdev/acct-switcher/releases/latest/download/acct-windows-x64.zip"><b>Download for Windows</b></a> &nbsp;·&nbsp; <a href="#get-started">Get started</a> &nbsp;·&nbsp; <a href="docs/usage.md">Docs</a>
 </p>
 
 <p align="center">
   <sub>Works with</sub><br>
-  <picture><source media="(prefers-color-scheme: dark)" srcset="https://github.com/Ker102/acct-switcher/raw/assets/brands/github-dark.svg"><img src="https://github.com/Ker102/acct-switcher/raw/assets/brands/github.svg" height="16" alt=""></picture>&nbsp;GitHub CLI &amp; Desktop &nbsp;·&nbsp; <img src="https://github.com/Ker102/acct-switcher/raw/assets/brands/claude.svg" height="16" alt="">&nbsp;Claude Code &nbsp;·&nbsp; <picture><source media="(prefers-color-scheme: dark)" srcset="https://github.com/Ker102/acct-switcher/raw/assets/brands/openai-dark.svg"><img src="https://github.com/Ker102/acct-switcher/raw/assets/brands/openai.svg" height="16" alt=""></picture>&nbsp;Codex &nbsp;·&nbsp; <img src="https://github.com/Ker102/acct-switcher/raw/assets/brands/discord.svg" height="16" alt="">&nbsp;Discord
+  <picture><source media="(prefers-color-scheme: dark)" srcset="https://github.com/OpenRootdev/acct-switcher/raw/assets/brands/github-dark.svg"><img src="https://github.com/OpenRootdev/acct-switcher/raw/assets/brands/github.svg" height="16" alt=""></picture>&nbsp;GitHub CLI &amp; Desktop &nbsp;·&nbsp; <img src="https://github.com/OpenRootdev/acct-switcher/raw/assets/brands/claude.svg" height="16" alt="">&nbsp;Claude Code &nbsp;·&nbsp; <picture><source media="(prefers-color-scheme: dark)" srcset="https://github.com/OpenRootdev/acct-switcher/raw/assets/brands/openai-dark.svg"><img src="https://github.com/OpenRootdev/acct-switcher/raw/assets/brands/openai.svg" height="16" alt=""></picture>&nbsp;Codex &nbsp;·&nbsp; <img src="https://github.com/OpenRootdev/acct-switcher/raw/assets/brands/discord.svg" height="16" alt="">&nbsp;Discord
 </p>
 
 ## What it does
@@ -43,7 +43,7 @@ Most account switchers cover one app, usually Codex or Claude Code. [TcNo Accoun
 
 ## Get started
 
-1. Download <a href="https://github.com/Ker102/acct-switcher/releases/latest/download/acct-windows-x64.zip">acct-windows-x64.zip</a> and unzip it into a folder on your <code>PATH</code>.
+1. Download <a href="https://github.com/OpenRootdev/acct-switcher/releases/latest/download/acct-windows-x64.zip">acct-windows-x64.zip</a> and unzip it into a folder on your <code>PATH</code>.
 2. Open <code>acct-desktop</code> for the window and tray menu, or type <code>acct</code> in a terminal.
 3. Add a second account to an app. acct saves the one you're signed in to now, then lets you sign in the new one. After that, <code>acct</code> lists your accounts and you type a number to switch:
 
@@ -66,8 +66,8 @@ acct
 - [`defs/`](defs/) · The built-in apps, one short file each.
 - [`docs/`](docs/) · Commands, adding an app, and how switching works.
 
-<sub>Preview images live on the <a href="https://github.com/Ker102/acct-switcher/tree/assets"><code>assets</code></a> branch, so <code>main</code> holds only the tool.</sub>
+<sub>Preview images live on the <a href="https://github.com/OpenRootdev/acct-switcher/tree/assets"><code>assets</code></a> branch, so <code>main</code> holds only the tool.</sub>
 
 ---
 
-<sub>MIT licence · <a href="https://github.com/Ker102">Ker102</a></sub>
+<sub>MIT licence · <a href="https://github.com/OpenRootdev">OpenRootdev</a></sub>
