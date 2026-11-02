@@ -31,7 +31,7 @@ acct keeps a saved sign-in for every account you use in an app. Pick one in the 
 - Scripts and AI agents can switch accounts by name, and never see a password or token.
 
 > [!NOTE]
-> Early version. Switching GitHub CLI, Azure CLI and Discord is tested on real accounts; the other built-in apps so far only in automated tests.
+> Early version. Switching GitHub CLI, Azure CLI, Discord and Cursor is tested on real accounts; the other built-in apps so far only in automated tests.
 
 ## How it's different
 
