@@ -447,7 +447,10 @@ fn apps(ctx: &Ctx) -> Result<(), Error> {
         for e in &errors {
             println!("{RED}!{RED:#} {}", e.message);
         }
-        println!("\n{DIM}Add your own: acswi learn <id>, or put a .toml file in %APPDATA%\\acswi\\apps{DIM:#}");
+        println!(
+            "\n{DIM}Add your own: acswi learn <id>, or put a .toml file in {}{DIM:#}",
+            ctx.acswi.paths.user_defs.display()
+        );
     });
     Ok(())
 }
@@ -712,11 +715,12 @@ fn doctor(ctx: &Ctx) -> Result<(), Error> {
         ok: true,
         detail: recovered.unwrap_or_else(|| "none".into()),
     });
-    let crypto = acswi_core::dpapi::protect(b"acswi", b"doctor").and_then(|c| acswi_core::dpapi::unprotect(&c, b"doctor"));
+    let sealer = acswi_core::seal::Sealer::new(&ctx.acswi.paths);
+    let crypto = sealer.seal(b"acswi", b"doctor").and_then(|c| sealer.open(&c, b"doctor"));
     checks.push(Check {
-        name: "encryption (DPAPI)".into(),
+        name: "encryption".into(),
         ok: crypto.is_ok(),
-        detail: crypto.map(|_| "works".into()).unwrap_or_else(|e| e.message),
+        detail: crypto.map(|_| format!("works ({})", sealer.describe())).unwrap_or_else(|e| e.message),
     });
     checks.push(Check {
         name: "data folder".into(),

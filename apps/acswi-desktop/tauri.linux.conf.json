@@ -1,0 +1,17 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Account Switcher",
+        "width": 440,
+        "height": 640,
+        "minWidth": 360,
+        "minHeight": 420,
+        "center": true,
+        "visible": false
+      }
+    ]
+  }
+}

@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[cfg(windows)]
 use std::os::windows::process::CommandExt;
 use std::process::Command;
 
@@ -10,6 +11,7 @@ use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, WindowEvent, Wry};
 
+#[cfg(windows)]
 const CREATE_NEW_CONSOLE: u32 = 0x0000_0010;
 const SEP: char = '\u{1f}';
 
@@ -83,7 +85,7 @@ fn remove_profile(handle: AppHandle, app: String, profile: String) -> Result<(),
 }
 
 /// Starts adding an account. Sign-in commands (gh auth login, …) need a terminal, so they
-/// run in their own console window; when it closes the account is saved automatically and
+/// run in their own console or terminal window; when it closes the account is saved automatically and
 /// `acswi://changed` is emitted.
 #[tauri::command(async)]
 fn add_begin(handle: AppHandle, app: String, profile: String, close: bool) -> Result<AddStep, Error> {
@@ -135,10 +137,18 @@ fn open_apps_folder() -> Result<(), Error> {
     let acswi = Acswi::open()?;
     let dir = &acswi.paths.user_defs;
     std::fs::create_dir_all(dir).map_err(|e| Error::io(dir.display(), e))?;
-    Command::new("explorer.exe").arg(dir).spawn().map_err(|e| Error::io("explorer", e))?;
+    let opener = if cfg!(windows) {
+        "explorer.exe"
+    } else if cfg!(target_os = "macos") {
+        "open"
+    } else {
+        "xdg-open"
+    };
+    Command::new(opener).arg(dir).spawn().map_err(|e| Error::io(opener, e))?;
     Ok(())
 }
 
+#[cfg(windows)]
 fn run_in_console(command: &[String], env: &[(String, String)]) -> Result<bool, Error> {
     let Some((prog, args)) = command.split_first() else { return Ok(true) };
     let path = acswi_core::paths::which(prog)
@@ -150,6 +160,67 @@ fn run_in_console(command: &[String], env: &[(String, String)]) -> Result<bool, 
         .status()
         .map_err(|e| Error::new(Code::CommandFailed, format!("{prog}: {e}")))?;
     Ok(status.success())
+}
+
+/// Runs the sign-in in a terminal window and waits for the window to close. Terminals don't
+/// pass the command's exit code on, so a small shell wrapper writes it to a file.
+#[cfg(not(windows))]
+fn run_in_console(command: &[String], env: &[(String, String)]) -> Result<bool, Error> {
+    let Some((prog, args)) = command.split_first() else { return Ok(true) };
+    let path = acswi_core::paths::which(prog)
+        .ok_or_else(|| Error::new(Code::NotInstalled, format!("{prog} was not found on PATH")))?;
+    let terminal = terminal().ok_or_else(|| {
+        Error::new(Code::NotInstalled, "No terminal app was found. Set $TERMINAL, or run `acswi add` in a terminal.")
+    })?;
+    let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
+    let status_file = std::env::temp_dir().join(format!("acswi-sign-in-{}-{stamp}", std::process::id()));
+    let _ = std::fs::remove_file(&status_file);
+    let quote = |s: &str| format!("'{}'", s.replace('\'', r"'\''"));
+    let words: Vec<String> = env
+        .iter()
+        .map(|(k, v)| format!("{k}={v}"))
+        .chain(std::iter::once(path.to_string_lossy().into_owned()))
+        .chain(args.iter().cloned())
+        .map(|w| quote(&w))
+        .collect();
+    let script = format!(
+        "env {}; rc=$?; echo $rc > {}; [ $rc = 0 ] || {{ printf '\\nSign-in did not finish. Press Enter to close.'; read _; }}",
+        words.join(" "),
+        quote(&status_file.to_string_lossy())
+    );
+    let (term, term_args) = terminal.split_first().expect("terminal command");
+    Command::new(term)
+        .args(term_args)
+        .args(["sh", "-c", &script])
+        .status()
+        .map_err(|e| Error::new(Code::CommandFailed, format!("{term}: {e}")))?;
+    let code = std::fs::read_to_string(&status_file).unwrap_or_default();
+    let _ = std::fs::remove_file(&status_file);
+    Ok(code.trim() == "0")
+}
+
+/// A terminal that stays open until the command ends: `$TERMINAL`, then common ones. Each
+/// entry ends with the flag after which the command follows.
+#[cfg(not(windows))]
+fn terminal() -> Option<Vec<String>> {
+    if let Some(t) = std::env::var_os("TERMINAL").filter(|t| !t.is_empty()) {
+        return Some(vec![t.to_string_lossy().into_owned(), "-e".into()]);
+    }
+    const KNOWN: &[&[&str]] = &[
+        &["gnome-terminal", "--wait", "--"],
+        &["konsole", "-e"],
+        &["xfce4-terminal", "--disable-server", "-x"],
+        &["kitty"],
+        &["alacritty", "-e"],
+        &["foot"],
+        &["wezterm", "start", "--always-new-process", "--"],
+        &["x-terminal-emulator", "-e"],
+        &["xterm", "-e"],
+    ];
+    KNOWN
+        .iter()
+        .find(|t| acswi_core::paths::which(t[0]).is_some())
+        .map(|t| t.iter().map(|s| s.to_string()).collect())
 }
 
 // ------------------------------------------------------------------ window + tray

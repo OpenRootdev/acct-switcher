@@ -1,14 +1,20 @@
 use std::env;
-use std::path::{Path, PathBuf};
+#[cfg(windows)]
+use std::path::Path;
+use std::path::PathBuf;
 
-use crate::error::{Error, Result};
+#[cfg(windows)]
+use crate::error::Error;
+use crate::error::Result;
 
 /// Where acswi keeps its own files.
 #[derive(Debug, Clone)]
 pub struct Paths {
-    /// `%LOCALAPPDATA%\acswi` (or `ACSWI_HOME`): state, vault, moved folders.
+    /// `%LOCALAPPDATA%\acswi`, `~/.local/share/acswi` on Linux, or `ACSWI_HOME`: state,
+    /// vault, moved folders.
     pub root: PathBuf,
-    /// `%APPDATA%\acswi\apps` (or `ACSWI_HOME\apps`): user app definitions.
+    /// `%APPDATA%\acswi\apps`, `~/.config/acswi/apps` on Linux, or `ACSWI_HOME/apps`: user
+    /// app definitions.
     pub user_defs: PathBuf,
 }
 
@@ -18,6 +24,11 @@ impl Paths {
             let root = PathBuf::from(home);
             return Ok(Paths { user_defs: root.join("apps"), root });
         }
+        Self::system()
+    }
+
+    #[cfg(windows)]
+    fn system() -> Result<Self> {
         let local = env::var_os("LOCALAPPDATA").map(PathBuf::from);
         let roaming = env::var_os("APPDATA").map(PathBuf::from);
         match (local, roaming) {
@@ -29,11 +40,29 @@ impl Paths {
         }
     }
 
+    #[cfg(target_os = "macos")]
+    fn system() -> Result<Self> {
+        let base = home().join("Library").join("Application Support").join("acswi");
+        Ok(Paths { user_defs: base.join("apps"), root: base })
+    }
+
+    /// XDG base directories: data in `~/.local/share`, definitions in `~/.config`.
+    #[cfg(all(unix, not(target_os = "macos")))]
+    fn system() -> Result<Self> {
+        let xdg = |var: &str, fallback: &str| {
+            env::var_os(var).map(PathBuf::from).filter(|p| p.is_absolute()).unwrap_or_else(|| home().join(fallback))
+        };
+        Ok(Paths {
+            root: xdg("XDG_DATA_HOME", ".local/share").join("acswi"),
+            user_defs: xdg("XDG_CONFIG_HOME", ".config").join("acswi").join("apps"),
+        })
+    }
 }
 
 /// `<base>\acswi`. The tool used to be called acct: an `<base>\acct` folder from then is
 /// renamed to `acswi` once. If it can't be renamed yet (an old acct is still running), it is
 /// used where it is, and renamed on a later run.
+#[cfg(windows)]
 fn renamed_from_acct(base: &Path) -> PathBuf {
     let new = base.join("acswi");
     let old = base.join("acct");
@@ -61,6 +90,14 @@ impl Paths {
     }
     pub fn entropy_file(&self) -> PathBuf {
         self.root.join("entropy")
+    }
+    /// Linux and macOS without a keyring: the vault key itself.
+    pub fn key_file(&self) -> PathBuf {
+        self.root.join("key")
+    }
+    /// Linux and macOS: present when the vault key is in the desktop keyring.
+    pub fn keyring_marker(&self) -> PathBuf {
+        self.root.join("key-in-keyring")
     }
     pub fn vault_blob(&self, app: &str, profile: &str) -> PathBuf {
         self.root.join("vault").join(app).join(format!("{profile}.bin"))
@@ -109,19 +146,41 @@ pub fn expand(raw: &str) -> PathBuf {
         }
     }
     out.push_str(rest);
-    PathBuf::from(out.replace('/', "\\"))
+    if cfg!(windows) {
+        out = out.replace('/', "\\");
+    }
+    PathBuf::from(out)
 }
 
+#[cfg(windows)]
 pub fn home() -> PathBuf {
     env::var_os("USERPROFILE").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("C:\\"))
 }
 
-/// Finds an executable on PATH (honouring PATHEXT), or checks an expanded path.
+#[cfg(not(windows))]
+pub fn home() -> PathBuf {
+    env::var_os("HOME").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("/"))
+}
+
+/// Finds an executable on PATH (honouring PATHEXT on Windows), or checks an expanded path.
 pub fn which(program: &str) -> Option<PathBuf> {
     let candidate = expand(program);
     if candidate.is_absolute() || program.contains(['\\', '/']) {
         return candidate.exists().then_some(candidate);
     }
+    search_path(program)
+}
+
+#[cfg(not(windows))]
+fn search_path(program: &str) -> Option<PathBuf> {
+    use std::os::unix::fs::PermissionsExt;
+    env::split_paths(&env::var_os("PATH")?)
+        .map(|dir| dir.join(program))
+        .find(|p| p.metadata().is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0))
+}
+
+#[cfg(windows)]
+fn search_path(program: &str) -> Option<PathBuf> {
     let exts: Vec<String> = env::var("PATHEXT")
         .unwrap_or_else(|_| ".EXE;.CMD;.BAT;.COM".into())
         .split(';')
@@ -170,6 +229,17 @@ pub fn slug(raw: &str) -> String {
 mod tests {
     use super::*;
 
+    #[cfg(not(windows))]
+    #[test]
+    fn expands_env_and_home() {
+        env::set_var("ACSWI_TEST_VAR", "/x");
+        assert_eq!(expand("%ACSWI_TEST_VAR%/y"), PathBuf::from("/x/y"));
+        assert_eq!(expand("~/.codex"), home().join(".codex"));
+        assert!(which("sh").is_some());
+        assert!(which("acswi-not-a-program").is_none());
+    }
+
+    #[cfg(windows)]
     #[test]
     fn expands_env_and_home() {
         env::set_var("ACSWI_TEST_VAR", "C:\\x");
@@ -178,6 +248,7 @@ mod tests {
         assert!(expand("~/.codex").to_string_lossy().ends_with("\\.codex"));
     }
 
+    #[cfg(windows)]
     #[test]
     fn old_acct_folder_is_renamed_once() {
         let base = tempfile::tempdir().unwrap();

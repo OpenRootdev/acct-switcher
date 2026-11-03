@@ -3,6 +3,8 @@
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 
+if (!navigator.userAgent.includes("Windows")) document.documentElement.classList.add("opaque");
+
 const $ = (id) => document.getElementById(id);
 const appsEl = $("apps");
 

@@ -150,6 +150,12 @@ impl Acswi {
 
     pub fn with_paths(paths: Paths) -> Result<Acswi> {
         fs::create_dir_all(&paths.root).map_err(|e| Error::io(paths.root.display(), e))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&paths.root, fs::Permissions::from_mode(0o700))
+                .map_err(|e| Error::io(paths.root.display(), e))?;
+        }
         let defs = Defs::load(&paths.user_defs);
         Ok(Acswi { paths, defs })
     }

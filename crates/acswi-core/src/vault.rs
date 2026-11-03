@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
 use crate::credman::Credential;
-use crate::dpapi;
+use crate::seal::Sealer;
 use crate::error::{Code, Error, Result};
 use crate::paths::Paths;
 use crate::state::write_atomic;
@@ -90,6 +90,7 @@ fn wipe(n: &mut RegNode) {
 pub struct Vault {
     paths: Paths,
     entropy: Vec<u8>,
+    sealer: Sealer,
 }
 
 impl Vault {
@@ -106,7 +107,7 @@ impl Vault {
             }
             Err(e) => return Err(Error::io(file.display(), e)),
         };
-        Ok(Vault { paths: paths.clone(), entropy })
+        Ok(Vault { paths: paths.clone(), entropy, sealer: Sealer::new(paths) })
     }
 
     pub fn path(&self, app: &str, profile: &str) -> PathBuf {
@@ -119,7 +120,7 @@ impl Vault {
 
     pub fn write(&self, path: &Path, snap: &Snapshot) -> Result<()> {
         let mut plain = rmp_serde::to_vec(snap).map_err(|e| Error::new(Code::Io, e.to_string()))?;
-        let cipher = dpapi::protect(&plain, &self.entropy);
+        let cipher = self.sealer.seal(&plain, &self.entropy);
         plain.zeroize();
         let mut out = MAGIC.to_vec();
         out.extend_from_slice(&cipher?);
@@ -139,7 +140,7 @@ impl Vault {
         let body = bytes
             .strip_prefix(MAGIC.as_slice())
             .ok_or_else(|| Error::new(Code::Crypto, format!("{} is not an acswi vault file", path.display())))?;
-        let mut plain = dpapi::unprotect(body, &self.entropy)?;
+        let mut plain = self.sealer.open(body, &self.entropy)?;
         let snap = rmp_serde::from_slice(&plain).map_err(|e| Error::new(Code::Crypto, format!("{}: {e}", path.display())));
         plain.zeroize();
         snap.map(Some)

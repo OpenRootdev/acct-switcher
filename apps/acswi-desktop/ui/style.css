@@ -13,6 +13,7 @@
   --warn-soft: rgba(157, 93, 0, 0.09);
   --danger: #c42b1c;
   --overlay: rgba(255, 255, 255, 0.96);
+  --window: #f3f3f3;
   --radius: 8px;
 }
 
@@ -31,6 +32,7 @@
     --warn-soft: rgba(252, 225, 0, 0.08);
     --danger: #ff99a4;
     --overlay: rgba(44, 44, 48, 0.98);
+    --window: #202020;
   }
 }
 
@@ -45,6 +47,9 @@ html, body {
   -webkit-font-smoothing: antialiased;
   user-select: none;
 }
+
+/* No Mica outside Windows: a plain window colour instead. */
+html.opaque, html.opaque body { background: var(--window); }
 
 button, input { font: inherit; color: inherit; }
 

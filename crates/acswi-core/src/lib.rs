@@ -1,12 +1,11 @@
-//! acswi: keep several signed-in accounts per app on one Windows PC and switch between them.
+//! acswi: keep several signed-in accounts per app on one computer and switch between them.
 //!
 //! The engine is generic: every app is described by an [`def::AppDef`] (TOML). See
 //! `docs/DESIGN.md` for the model and `defs/` for examples.
 
-#![cfg(windows)]
-
 pub mod credman;
 pub mod def;
+#[cfg(windows)]
 pub mod dpapi;
 pub mod engine;
 pub mod envvar;
@@ -16,6 +15,8 @@ pub mod learn;
 pub mod native;
 pub mod paths;
 pub mod process;
+pub mod registry;
+pub mod seal;
 pub mod state;
 pub mod vault;
 

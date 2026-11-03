@@ -1,6 +1,6 @@
 # acswi — design
 
-`acswi` keeps several signed-in accounts per app or CLI on one Windows PC and switches which
+`acswi` keeps several signed-in accounts per app or CLI on one computer (Windows or Linux) and switches which
 one the app uses, without signing in again. It is one account at a time per app, not
 side-by-side sessions.
 
@@ -14,8 +14,9 @@ side-by-side sessions.
 3. **Never lose a session.** Before switching away, the live state is saved back to the
    active profile, so rotated refresh tokens are kept. Swaps happen only while the app is
    closed, and each switch is journaled so an interrupted one can be finished or rolled back.
-4. **As safe as the app itself, or safer.** Saved state is encrypted with DPAPI (bound to
-   this Windows user on this PC). The CLI has no command that prints a secret.
+4. **As safe as the app itself, or safer.** Saved state is encrypted for this user on this
+   computer (DPAPI on Windows, a keyring-held key on Linux). The CLI has no command that prints
+   a secret.
 5. **Simple to use.** `acswi gh work` switches. `acswi` alone shows everything.
 
 ## App definition
@@ -41,10 +42,10 @@ State kinds:
 
 | kind | live location | how it is stored per profile |
 |---|---|---|
-| `file` | one file | encrypted (DPAPI) in the vault |
-| `dir` | a folder | `mode = "encrypt"`: packed + encrypted (small config dirs, with `exclude` globs); `mode = "move"`: the folder is moved aside unencrypted (large Electron profiles whose secrets are already DPAPI-wrapped by the app) |
-| `credential` | Windows Credential Manager targets matching a pattern (`gh:github.com:*`) | encrypted in the vault |
-| `registry` | an `HKCU` key, recursively | encrypted in the vault |
+| `file` | one file | encrypted in the vault |
+| `dir` | a folder | `mode = "encrypt"`: packed + encrypted (small config dirs, with `exclude` globs); `mode = "move"`: the folder is moved aside unencrypted (large Electron profiles whose secrets the app already encrypts with DPAPI or the keyring) |
+| `credential` | Windows Credential Manager targets matching a pattern (`gh:github.com:*`); Windows only | encrypted in the vault |
+| `registry` | an `HKCU` key, recursively; Windows only | encrypted in the vault |
 | `json_key` | one key inside a shared JSON file (e.g. `oauthAccount` in `~/.claude.json`); the rest of the file is left alone | encrypted in the vault |
 
 Strategies:
@@ -57,21 +58,25 @@ Strategies:
   (`CODEX_HOME`, `CLAUDE_CONFIG_DIR`, …). Nothing is copied, but settings and history are
   per-profile too, and only newly started programs see the change.
 
-Definitions are loaded from the built-ins and from `%APPDATA%\acswi\apps\*.toml` (user
-definitions win).
+Definitions are loaded from the built-ins and from `%APPDATA%\acswi\apps\*.toml`
+(`~/.config/acswi/apps/*.toml` on Linux); user definitions win. An `[os.<system>]` table
+replaces fields on that system and `platforms` hides a definition elsewhere, so the engine only
+ever sees the definition for the system it runs on.
 
 ## Adding a new app without knowing where it stores things: `acswi learn`
 
 `acswi learn <name>` records a fingerprint of likely locations (folders in `%APPDATA%`,
-`%LOCALAPPDATA%`, dot-folders in the home folder, Credential Manager targets), asks you to
+`%LOCALAPPDATA%`, `~/.config` and `~/.local/share`, dot-folders in the home folder, Credential
+Manager targets on Windows), asks you to
 sign in to the app, then shows what changed and writes a draft definition for you to review.
 
-## Storage — `%LOCALAPPDATA%\acswi\`
+## Storage — `%LOCALAPPDATA%\acswi\`, `~/.local/share/acswi/` on Linux
 
 | path | contents |
 |---|---|
 | `state.json` | profiles, active profile per app, recorded identities, timestamps — no secrets |
-| `vault\<app>\<profile>.bin` | DPAPI-encrypted state (with per-install entropy) |
+| `vault\<app>\<profile>.bin` | encrypted state, bound to the per-install `entropy` value |
+| `key` or `key-in-keyring` | Linux: the vault key, or a marker saying it is in the keyring |
 | `profiles\<app>\<profile>\` | moved folders (`mode = "move"`) and env-strategy config folders |
 | `journal.json` | in-progress switch, used to recover after a crash |
 | `audit.log` | one line per switch: time, app, from, to, who (cli / ui / agent) |
@@ -92,11 +97,13 @@ sign in to the app, then shows what changed and writes a draft definition for yo
 
 ## Security
 
-- DPAPI `CurrentUser` with an extra per-install entropy value. Secrets are wiped from memory
-  after use (`zeroize`).
+- Windows: DPAPI `CurrentUser` with an extra per-install entropy value. Linux:
+  XChaCha20-Poly1305 with the entropy as associated data and a random key in the Secret Service
+  keyring, stored only when the keyring is already unlocked so acswi never causes a password
+  prompt; otherwise in a 0600 key file. Secrets are wiped from memory after use (`zeroize`).
 - No `show`/`get-token` command. JSON output contains profile names and identities only.
 - `add`, `learn` and `remove` need an interactive terminal; agents get `needs_human`.
-- Limit: a program running as you can still decrypt DPAPI data or run `gh auth token`
+- Limit: a program running as you can still decrypt the vault or run `gh auth token`
   itself. This matches what the apps themselves offer: most CLIs keep tokens in plain files
   or in Credential Manager. A stronger wall (a broker running as a separate Windows account)
   is possible later but out of scope.

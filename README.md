@@ -6,7 +6,7 @@
 
 <p align="center">
   Sign in to each of your accounts once, then switch any app between them in one click.<br>
-  <sub>For people with several accounts in the same CLI or desktop app on Windows: work and personal, clients, test accounts.</sub>
+  <sub>For people with several accounts in the same CLI or desktop app on Windows or Linux: work and personal, clients, test accounts.</sub>
 </p>
 
 <p align="center">
@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/OpenRootdev/acswi/releases/latest/download/acswi-windows-x64.zip"><b>Download for Windows</b></a> &nbsp;·&nbsp; <a href="#get-started">Get started</a> &nbsp;·&nbsp; <a href="docs/usage.md">Docs</a>
+  <a href="https://github.com/OpenRootdev/acswi/releases/latest/download/acswi-windows-x64.zip"><b>Download for Windows</b></a> &nbsp;·&nbsp; <a href="https://github.com/OpenRootdev/acswi/releases/latest/download/acswi-linux-x64.tar.gz"><b>Download for Linux</b></a> &nbsp;·&nbsp; <a href="#get-started">Get started</a> &nbsp;·&nbsp; <a href="docs/usage.md">Docs</a>
 </p>
 
 <p align="center">
@@ -30,12 +30,12 @@
 
 Account Switcher (<code>acswi</code>) keeps a saved sign-in for every account you use in an app. Pick one in the window, the tray or the terminal, and the app is signed in to it, with no password or browser sign-in.
 
-- Works with command-line tools and desktop apps. GitHub CLI, Azure CLI, Claude Code, Codex, Cursor, GitHub Desktop and Discord are built in; any other app can be added with a short file.
-- Saved sign-ins stay on your PC, encrypted for your Windows user.
+- Works with command-line tools and desktop apps. GitHub CLI, Azure CLI, Claude Code, Codex, Cursor, Discord and (on Windows) GitHub Desktop are built in; any other app can be added with a short file.
+- Saved sign-ins stay on your computer, encrypted for your user: with Windows DPAPI, or with a key in your Linux keyring.
 - Scripts and AI agents can switch accounts by name, and never see a password or token.
 
 > [!NOTE]
-> Early version. Switching GitHub CLI, Azure CLI, Discord and Cursor is tested on real accounts; the other built-in apps so far only in automated tests.
+> Early version. Switching GitHub CLI, Azure CLI, Discord and Cursor is tested on real accounts on Windows; the other built-in apps so far only in automated tests. Linux support is new: it passes the automated tests on Ubuntu and the window runs there, but no app has been switched on real Linux accounts yet.
 
 ## How it's different
 
@@ -47,7 +47,7 @@ Most account switchers cover one app, usually Codex or Claude Code. [TcNo Accoun
 
 ## Get started
 
-1. Download <a href="https://github.com/OpenRootdev/acswi/releases/latest/download/acswi-windows-x64.zip">acswi-windows-x64.zip</a> and unzip it into a folder on your <code>PATH</code>.
+1. Download <a href="https://github.com/OpenRootdev/acswi/releases/latest/download/acswi-windows-x64.zip">acswi-windows-x64.zip</a> or <a href="https://github.com/OpenRootdev/acswi/releases/latest/download/acswi-linux-x64.tar.gz">acswi-linux-x64.tar.gz</a> and unpack it into a folder on your <code>PATH</code>, such as <code>~/.local/bin</code> on Linux.
 2. Open <code>acswi-desktop</code> for the window and tray menu, or type <code>acswi</code> in a terminal.
 3. Add a second account to an app. acswi saves the one you're signed in to now, then lets you sign in the new one. After that, <code>acswi</code> lists your accounts and you type a number to switch:
 
@@ -59,8 +59,9 @@ acswi
 ## What you need
 
 - Windows 11. Windows 10 with the WebView2 runtime should work but is not tested.
+- Or Linux on x86-64 with glibc 2.35 or newer (Ubuntu 22.04, Debian 12, Fedora 36 and later). The window needs WebKitGTK 4.1 (`libwebkit2gtk-4.1-0` on Debian and Ubuntu), and the tray icon a desktop with AppIndicator support.
 - The apps you want to switch, each signed in once through acswi.
-- To build it yourself instead: Rust and the Visual Studio C++ build tools (<a href="docs/usage.md#build-from-source">how</a>).
+- To build it yourself instead: Rust, plus the Visual Studio C++ build tools on Windows or the WebKitGTK development packages on Linux (<a href="docs/usage.md#build-from-source">how</a>).
 
 ## What's inside
 

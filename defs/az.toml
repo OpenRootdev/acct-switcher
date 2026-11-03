@@ -1,6 +1,6 @@
 # Azure CLI keeps every signed-in user; `az account set` picks the active one.
-# On Windows the tokens live in the Web Account Manager (device-bound), so they
-# are never copied - acswi only selects the account.
+# On Windows the tokens live in the Web Account Manager (device-bound), on Linux in
+# ~/.azure. They are never copied - acswi only selects the account.
 id = "az"
 name = "Azure CLI"
 strategy = "native"

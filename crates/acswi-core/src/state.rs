@@ -104,6 +104,13 @@ pub fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
     ));
     {
         let mut f = fs::File::create(&tmp).map_err(|e| Error::io(tmp.display(), e))?;
+        // Restored files often hold tokens: keep an existing file's mode, else only this user.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = fs::metadata(path).map_or(0o600, |m| m.permissions().mode() & 0o7777);
+            f.set_permissions(fs::Permissions::from_mode(mode)).map_err(|e| Error::io(tmp.display(), e))?;
+        }
         f.write_all(bytes).map_err(|e| Error::io(tmp.display(), e))?;
         f.sync_all().map_err(|e| Error::io(tmp.display(), e))?;
     }

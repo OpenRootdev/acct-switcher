@@ -34,3 +34,34 @@ mode = "move"
 kind = "dir"
 path = '%APPDATA%\Cursor\Network'
 mode = "move"
+
+[os.linux]
+detect = ["cursor", "/usr/share/cursor/cursor"]
+processes = ["cursor"]
+launch = ["cursor"]
+notes = "Each account keeps its own chat history. Profiles only work for this Linux user, whose keyring holds Cursor's encryption key."
+
+[[os.linux.state]]
+kind = "dir"
+path = "~/.config/Cursor/User/globalStorage"
+mode = "move"
+
+[[os.linux.state]]
+kind = "dir"
+path = "~/.config/Cursor/Local Storage"
+mode = "move"
+
+[[os.linux.state]]
+kind = "dir"
+path = "~/.config/Cursor/Session Storage"
+mode = "move"
+
+[[os.linux.state]]
+kind = "dir"
+path = "~/.config/Cursor/IndexedDB"
+mode = "move"
+
+[[os.linux.state]]
+kind = "dir"
+path = "~/.config/Cursor/Network"
+mode = "move"

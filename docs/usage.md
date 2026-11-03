@@ -47,6 +47,11 @@ undo it with `acswi add <app> --finish` or `acswi add <app> --cancel`.
 saved copy or remove it. Closing the window keeps acswi in the tray, where each app has a submenu
 of its accounts. Start it with `--hidden` to go straight to the tray.
 
+On Linux the tray icon needs a desktop with AppIndicator support (on GNOME, the AppIndicator
+extension); without it, use the window. Sign-in commands open in a terminal window: `$TERMINAL`
+if it is set, otherwise the first of GNOME Terminal, Konsole, Xfce Terminal, kitty, Alacritty,
+foot, WezTerm and xterm that is installed.
+
 ## For scripts and AI agents
 
 Without a terminal (or with `--json`), `acswi` and `acswi <app>` print the list instead of asking.
@@ -64,22 +69,45 @@ Add `--json` to any command. Output is always `{"ok": true, "data": …}` or
 
 Agents switch by profile name (`acswi use gh work --json`). There is no command that prints a
 token, and `add`/`learn` refuse to run without a terminal. Every switch is written to
-`%LOCALAPPDATA%\acswi\audit.log` with who made it (`cli`, `ui` or `agent`).
+`audit.log` in the data folder (see below) with who made it (`cli`, `ui` or `agent`).
+
+## Where acswi keeps its files
+
+| what | Windows | Linux |
+|---|---|---|
+| saved accounts, state, audit log | `%LOCALAPPDATA%\acswi` | `~/.local/share/acswi` |
+| your app definitions | `%APPDATA%\acswi\apps` | `~/.config/acswi/apps` |
+| key that encrypts saved accounts | DPAPI, tied to your Windows user | your desktop keyring, or a `key` file in the data folder |
+
+On Linux, `XDG_DATA_HOME` and `XDG_CONFIG_HOME` move those folders. `ACSWI_HOME` puts everything
+in one folder (handy for tests). A new Linux install keeps its key in the keyring when the keyring
+is unlocked, as it normally is after you log in; otherwise, or with `ACSWI_NO_KEYRING=1`, it uses
+the key file, which only your user can read.
+
+The tool used to be called acct. Its `%LOCALAPPDATA%\acct` and `%APPDATA%\acct` folders are
+renamed to `acswi` the first time acswi runs, so saved accounts carry over.
 
 ## Build from source
 
-Needs Rust (stable, MSVC) and the Visual Studio C++ build tools. WebView2 is part of Windows 11.
+On Windows you need Rust (stable, MSVC) and the Visual Studio C++ build tools. WebView2 is part of
+Windows 11.
+
+On Linux you need Rust and the WebKitGTK development packages. On Debian and Ubuntu:
+
+```
+sudo apt install build-essential pkg-config libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev
+```
+
+Then:
 
 ```
 cargo build --release
 ```
 
-Produces `target\release\acswi.exe` (CLI) and `target\release\acswi-desktop.exe` (window and tray).
-Put both in a folder on your `PATH`.
+This produces `acswi` (the command) and `acswi-desktop` (window and tray) in `target/release`,
+with `.exe` on Windows. Put both in a folder on your `PATH`. `cargo build --release -p acswi-cli`
+builds only the command, which needs none of the WebKitGTK packages.
 
-Data lives in `%LOCALAPPDATA%\acswi` (`ACSWI_HOME` overrides it, e.g. for tests).
-The tool used to be called acct. Its `%LOCALAPPDATA%\acct` and `%APPDATA%\acct` folders are
-renamed to `acswi` the first time acswi runs, so saved accounts carry over.
-
-Tests: `cargo test -p acswi-core` (uses real DPAPI and Credential Manager under a temporary folder;
-it creates and deletes `acswi-selftest*` credentials).
+Tests: `cargo test -p acswi-core -p acswi-cli`. On Windows they use real DPAPI and Credential
+Manager under a temporary folder, creating and deleting `acswi-selftest*` credentials. On Linux
+they use a key file, never your keyring.

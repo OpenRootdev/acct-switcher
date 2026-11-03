@@ -4,6 +4,8 @@
 id = "github-desktop"
 name = "GitHub Desktop"
 strategy = "swap"
+# Windows only: the Linux builds are a community fork that keeps its token elsewhere.
+platforms = ["windows"]
 detect = ['%LOCALAPPDATA%\GitHubDesktop\GitHubDesktop.exe']
 processes = ["GitHubDesktop.exe"]
 launch = ['%LOCALAPPDATA%\GitHubDesktop\GitHubDesktop.exe']

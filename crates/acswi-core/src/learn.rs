@@ -1,22 +1,23 @@
-//! `acswi learn`: find where an unknown app keeps its sign-in by comparing the disk, the
-//! registry and Credential Manager before and after you sign in.
+//! `acswi learn`: find where an unknown app keeps its sign-in by comparing the disk (and on
+//! Windows the registry and Credential Manager) before and after you sign in.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
+#[cfg(windows)]
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
 use serde::Serialize;
-use winreg::enums::{HKEY_CURRENT_USER, KEY_READ};
-use winreg::RegKey;
+#[cfg(windows)]
+use winreg::{enums::{HKEY_CURRENT_USER, KEY_READ}, RegKey};
 
-use crate::credman;
 use crate::error::Result;
 use crate::paths::home;
 use crate::process;
 
 const MAX_FILES_PER_ROOT: usize = 60_000;
+#[cfg(windows)]
 const MAX_KEYS_PER_ROOT: usize = 5_000;
 /// Above this many changed files in one folder, the draft names the folder instead.
 const MAX_FILES_LISTED: usize = 8;
@@ -69,7 +70,8 @@ fn norm(s: &str) -> String {
 }
 
 /// Folders whose name looks like the app (`hint`), in the usual places, including
-/// Microsoft Store app folders (`%LOCALAPPDATA%\Packages\<family name>`).
+/// Microsoft Store app folders (`%LOCALAPPDATA%\Packages\<family name>`) on Windows and
+/// Flatpak and Snap folders on Linux.
 pub fn candidate_roots(hint: &str) -> Vec<PathBuf> {
     let h = norm(hint);
     let mut bases: Vec<PathBuf> = ["APPDATA", "LOCALAPPDATA"]
@@ -81,6 +83,9 @@ pub fn candidate_roots(hint: &str) -> Vec<PathBuf> {
     }
     bases.push(home());
     bases.push(home().join(".config"));
+    if cfg!(unix) {
+        bases.extend([".local/share", ".var/app", "snap"].map(|b| home().join(b)));
+    }
     let mut out = Vec::new();
     for base in bases {
         let Ok(entries) = fs::read_dir(&base) else { continue };
@@ -96,7 +101,13 @@ pub fn candidate_roots(hint: &str) -> Vec<PathBuf> {
     out
 }
 
+#[cfg(not(windows))]
+pub fn registry_roots(_hint: &str) -> Vec<String> {
+    Vec::new()
+}
+
 /// Registry keys named like the app: `HKCU\Software\<App>` and `HKCU\Software\<Vendor>\<App>`.
+#[cfg(windows)]
 pub fn registry_roots(hint: &str) -> Vec<String> {
     let h = norm(hint);
     let mut out = Vec::new();
@@ -126,11 +137,20 @@ pub fn registry_roots(hint: &str) -> Vec<String> {
 
 /// Whether `root` is a Microsoft Store app folder; returns its package family name.
 fn package_name(root: &Path) -> Option<String> {
+    if cfg!(not(windows)) {
+        return None;
+    }
     let parent = root.parent()?.file_name()?.to_string_lossy();
     parent.eq_ignore_ascii_case("Packages").then(|| root.file_name().unwrap().to_string_lossy().into_owned())
 }
 
+#[cfg(not(windows))]
+fn take_registry(_roots: &[String]) -> HashMap<String, u64> {
+    HashMap::new()
+}
+
 /// Hashes every key's values under each root, so a later snapshot shows which keys changed.
+#[cfg(windows)]
 fn take_registry(roots: &[String]) -> HashMap<String, u64> {
     let mut keys = HashMap::new();
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
@@ -194,7 +214,10 @@ pub fn take(roots: &[PathBuf], registry: &[String]) -> Result<Fingerprint> {
             }
         }
     }
-    let creds = credman::list_info(None)?.into_iter().map(|c| (c.target, c.last_written)).collect();
+    #[cfg(windows)]
+    let creds = crate::credman::list_info(None)?.into_iter().map(|c| (c.target, c.last_written)).collect();
+    #[cfg(not(windows))]
+    let creds = HashMap::new();
     Ok(Fingerprint { roots: roots.to_vec(), files, keys: take_registry(registry), creds })
 }
 
@@ -329,7 +352,8 @@ pub fn draft(id: &str, name: &str, report: &Report) -> String {
         }
         p.to_string()
     };
-    let mut t = format!("# Draft made by `acswi learn`. Review it, then save it to %APPDATA%\\acswi\\apps\\{id}.toml\n");
+    let folder = if cfg!(windows) { "%APPDATA%\\acswi\\apps\\" } else { "~/.config/acswi/apps/" };
+    let mut t = format!("# Draft made by `acswi learn`. Review it, then save it to {folder}{id}.toml\n");
     t += &format!("id = {}\nname = {}\nstrategy = \"swap\"\n", toml_str(id), toml_str(name));
     if !report.processes.is_empty() {
         let list: Vec<String> = report.processes.iter().map(|p| toml_str(p)).collect();
@@ -370,6 +394,7 @@ mod tests {
         assert_eq!(outermost(keys), vec![r"Software\Vendor\App".to_string(), r"Software\Vendor\Apple".to_string()]);
     }
 
+    #[cfg(windows)]
     #[test]
     fn store_app_folders() {
         let root = Path::new(r"C:\Users\a\AppData\Local\Packages\SpotifyAB.SpotifyMusic_zpdnekdrzrea0");
@@ -377,6 +402,7 @@ mod tests {
         assert_eq!(package_name(Path::new(r"C:\Users\a\AppData\Roaming\discord")), None);
     }
 
+    #[cfg(windows)]
     #[test]
     fn registry_changes_are_found() {
         let root = r"Software\acswi-selftest-learn";

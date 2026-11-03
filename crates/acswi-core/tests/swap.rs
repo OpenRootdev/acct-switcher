@@ -1,14 +1,23 @@
-//! End-to-end swap cycle on a fake app that uses every kind of state item.
+//! End-to-end swap cycle on a fake app that uses every kind of state item (Credential
+//! Manager ones only on Windows).
 
 use std::fs;
 use std::path::Path;
 
+#[cfg(windows)]
 use acswi_core::credman::{self, Credential};
 use acswi_core::engine::{Acswi, Actor, AddStep, SwitchOptions};
 use acswi_core::paths::Paths;
 use acswi_core::Code;
 
+#[cfg(windows)]
 const CRED: &str = "acswi-selftest-swap:token";
+const LOGIN: &str = if cfg!(windows) { "['cmd', '/c', 'exit', '0']" } else { "['true']" };
+
+/// Tests use a key file, never the desktop keyring of whoever runs them.
+fn no_keyring() {
+    std::env::set_var("ACSWI_NO_KEYRING", "1");
+}
 
 fn sign_in(live: &Path, who: &str, token: &str) {
     fs::create_dir_all(live.join("Session")).unwrap();
@@ -20,6 +29,7 @@ fn sign_in(live: &Path, who: &str, token: &str) {
         .unwrap_or_else(|| serde_json::json!({ "theme": "dark" }));
     cfg["account"] = serde_json::Value::String(who.into());
     fs::write(live.join("cfg.json"), serde_json::to_vec(&cfg).unwrap()).unwrap();
+    #[cfg(windows)]
     credman::write(&Credential {
         target: CRED.into(),
         user: who.into(),
@@ -38,33 +48,34 @@ fn live_token(live: &Path) -> Option<String> {
     fs::read_to_string(live.join("auth.json")).ok()
 }
 
+#[cfg(windows)]
 fn cred_user() -> Option<String> {
     credman::read(Some(CRED)).unwrap().first().map(|c| c.user.clone())
 }
 
 #[test]
 fn full_cycle() {
+    no_keyring();
     let tmp = tempfile::tempdir().unwrap();
     let home = tmp.path().join("acswi");
     let live = tmp.path().join("app");
     fs::create_dir_all(home.join("apps")).unwrap();
     let l = live.to_string_lossy().replace('\\', "/");
+    let cred = if cfg!(windows) { "[[state]]\nkind = \"credential\"\npattern = \"acswi-selftest-swap:*\"" } else { "" };
     fs::write(
         home.join("apps").join("selftest.toml"),
         format!(
             r#"
 id = "selftest"
 name = "Self Test"
-login = ["cmd", "/c", "exit", "0"]
+login = {LOGIN}
 [identity]
 file = "{l}/cfg.json"
 pointer = "/account"
 [[state]]
 kind = "file"
 path = "{l}/auth.json"
-[[state]]
-kind = "credential"
-pattern = "acswi-selftest-swap:*"
+{cred}
 [[state]]
 kind = "json_key"
 path = "{l}/cfg.json"
@@ -95,6 +106,7 @@ mode = "move"
         other => panic!("unexpected {other:?}"),
     }
     assert_eq!(live_token(&live), None);
+    #[cfg(windows)]
     assert_eq!(cred_user(), None);
     assert!(!live.join("Session").exists());
     let cfg: serde_json::Value = serde_json::from_slice(&fs::read(live.join("cfg.json")).unwrap()).unwrap();
@@ -109,6 +121,7 @@ mode = "move"
     assert!(r.changed);
     assert_eq!(r.identity.as_deref(), Some("alice"));
     assert_eq!(live_token(&live).as_deref(), Some("tokA1"));
+    #[cfg(windows)]
     assert_eq!(cred_user().as_deref(), Some("alice"));
     assert_eq!(fs::read_to_string(live.join("Session").join("db")).unwrap(), "alice");
 
@@ -144,11 +157,13 @@ mode = "move"
     assert!(audit.lines().count() >= 4);
     assert!(!audit.contains("tok"), "audit log must not contain secrets");
 
+    #[cfg(windows)]
     credman::delete(CRED).unwrap();
 }
 
 #[test]
 fn cancel_add_restores_previous() {
+    no_keyring();
     let tmp = tempfile::tempdir().unwrap();
     let home = tmp.path().join("acswi");
     let live = tmp.path().join("app");
@@ -157,7 +172,7 @@ fn cancel_add_restores_previous() {
     let l = live.to_string_lossy().replace('\\', "/");
     fs::write(
         home.join("apps").join("t2.toml"),
-        format!("id='t2'\nname='T2'\nlogin=['cmd','/c','exit','0']\n[[state]]\nkind='file'\npath='{l}/auth.json'\n"),
+        format!("id='t2'\nname='T2'\nlogin={LOGIN}\n[[state]]\nkind='file'\npath='{l}/auth.json'\n"),
     )
     .unwrap();
     let acswi = Acswi::with_paths(Paths { root: home.clone(), user_defs: home.join("apps") }).unwrap();

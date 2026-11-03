@@ -5,15 +5,14 @@ use std::path::{Path, PathBuf};
 
 use globset::{Glob, GlobBuilder, GlobSet, GlobSetBuilder};
 use serde_json::Value;
-use winreg::enums::{RegType, HKEY_CURRENT_USER, KEY_READ};
-use winreg::RegKey;
 
 use crate::credman::{self, Credential};
+use crate::registry;
 use crate::def::{DirMode, StateItem};
 use crate::error::{Code, Error, Result};
 use crate::paths::expand;
 use crate::state::write_atomic;
-use crate::vault::{PackedFile, RegNode, RegValue, Saved};
+use crate::vault::{PackedFile, Saved};
 
 /// Where `mode = "move"` folders of one profile are kept.
 pub struct MoveStore<'a> {
@@ -55,7 +54,7 @@ pub fn present(item: &StateItem) -> Result<bool> {
         StateItem::Dir { path, mode: DirMode::Move, .. } => expand(path).exists(),
         StateItem::Dir { path, exclude, .. } => !walk(&expand(path), &excludes(exclude)?)?.is_empty(),
         StateItem::Credential { pattern } => !matching_credentials(pattern)?.is_empty(),
-        StateItem::Registry { key } => RegKey::predef(HKEY_CURRENT_USER).open_subkey_with_flags(key, KEY_READ).is_ok(),
+        StateItem::Registry { key } => registry::present(key)?,
         StateItem::JsonKey { path, keys } => match read_json(&expand(path))? {
             Some(doc) => keys.iter().any(|k| doc.pointer(k).is_some()),
             None => false,
@@ -93,17 +92,14 @@ pub fn capture(item: &StateItem, store: &MoveStore) -> Result<Saved> {
             let root = expand(path);
             let mut files = Vec::new();
             for rel in walk(&root, &excludes(exclude)?)? {
-                let full = root.join(&rel);
+                let full = root.join(native(&rel));
                 let data = fs::read(&full).map_err(|e| Error::io(full.display(), e))?;
-                files.push(PackedFile { path: rel.replace('\\', "/"), data });
+                files.push(PackedFile { path: rel, data });
             }
             Saved::Dir(files)
         }
         StateItem::Credential { pattern } => Saved::Credentials(matching_credentials(pattern)?),
-        StateItem::Registry { key } => match RegKey::predef(HKEY_CURRENT_USER).open_subkey_with_flags(key, KEY_READ) {
-            Ok(k) => Saved::Registry(Some(read_reg(&k)?)),
-            Err(_) => Saved::Registry(None),
-        },
+        StateItem::Registry { key } => Saved::Registry(registry::capture(key)?),
         StateItem::JsonKey { path, keys } => {
             let doc = read_json(&expand(path))?;
             Saved::JsonKey(
@@ -126,7 +122,7 @@ pub fn clear(item: &StateItem) -> Result<()> {
         StateItem::Dir { path, exclude, .. } => {
             let root = expand(path);
             for rel in walk(&root, &excludes(exclude)?)? {
-                let full = root.join(rel);
+                let full = root.join(native(&rel));
                 fs::remove_file(&full).map_err(|e| Error::io(full.display(), e))?;
             }
             Ok(())
@@ -137,11 +133,7 @@ pub fn clear(item: &StateItem) -> Result<()> {
             }
             Ok(())
         }
-        StateItem::Registry { key } => match RegKey::predef(HKEY_CURRENT_USER).delete_subkey_all(key) {
-            Ok(()) => Ok(()),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-            Err(e) => Err(Error::io(format!("HKCU\\{key}"), e)),
-        },
+        StateItem::Registry { key } => registry::clear(key),
         StateItem::JsonKey { path, keys } => {
             let p = expand(path);
             let Some(mut doc) = read_json(&p)? else { return Ok(()) };
@@ -188,7 +180,7 @@ pub fn restore(item: &StateItem, saved: Option<&Saved>, store: &MoveStore) -> Re
         (StateItem::Dir { path, .. }, Some(Saved::Dir(files))) => {
             let root = expand(path);
             for f in files {
-                write_atomic(&root.join(f.path.replace('/', "\\")), &f.data)?;
+                write_atomic(&root.join(native(&f.path)), &f.data)?;
             }
             Ok(())
         }
@@ -196,12 +188,7 @@ pub fn restore(item: &StateItem, saved: Option<&Saved>, store: &MoveStore) -> Re
             creds.iter().try_for_each(credman::write)
         }
         (StateItem::Registry { key }, Some(Saved::Registry(node))) => match node {
-            Some(n) => {
-                let (k, _) = RegKey::predef(HKEY_CURRENT_USER)
-                    .create_subkey(key)
-                    .map_err(|e| Error::io(format!("HKCU\\{key}"), e))?;
-                write_reg(&k, n)
-            }
+            Some(n) => registry::restore(key, n),
             None => Ok(()),
         },
         (StateItem::JsonKey { path, keys }, Some(Saved::JsonKey(values))) => {
@@ -277,7 +264,12 @@ fn excludes(patterns: &[String]) -> Result<GlobSet> {
     b.build().map_err(|e| Error::new(Code::InvalidDefinition, e.to_string()))
 }
 
-/// Relative paths (with `\`) of files under `root`, minus excluded ones.
+/// `a/b.txt` as a path for this OS.
+fn native(rel: &str) -> PathBuf {
+    rel.split('/').collect()
+}
+
+/// Relative paths (with `/`) of files under `root`, minus excluded ones.
 fn walk(root: &Path, exclude: &GlobSet) -> Result<Vec<String>> {
     let mut out = Vec::new();
     if !root.is_dir() {
@@ -288,7 +280,7 @@ fn walk(root: &Path, exclude: &GlobSet) -> Result<Vec<String>> {
         for entry in fs::read_dir(&dir).map_err(|e| Error::io(dir.display(), e))? {
             let entry = entry.map_err(|e| Error::io(dir.display(), e))?;
             let path = entry.path();
-            let rel = path.strip_prefix(root).unwrap_or(&path).to_string_lossy().replace('\\', "/");
+            let rel = path.strip_prefix(root).unwrap_or(&path).to_string_lossy().replace(std::path::MAIN_SEPARATOR, "/");
             if exclude.is_match(&rel) {
                 continue;
             }
@@ -296,7 +288,7 @@ fn walk(root: &Path, exclude: &GlobSet) -> Result<Vec<String>> {
             if ft.is_dir() {
                 stack.push(path);
             } else if ft.is_file() {
-                out.push(rel.replace('/', "\\"));
+                out.push(rel);
             }
         }
     }
@@ -381,51 +373,6 @@ fn set_pointer(doc: &mut Value, pointer: &str, value: Value) {
         *cur = Value::Object(Default::default());
     }
     cur.as_object_mut().unwrap().insert(last.clone(), value);
-}
-
-fn reg_type(n: u32) -> RegType {
-    use RegType::*;
-    match n {
-        0 => REG_NONE,
-        1 => REG_SZ,
-        2 => REG_EXPAND_SZ,
-        3 => REG_BINARY,
-        4 => REG_DWORD,
-        5 => REG_DWORD_BIG_ENDIAN,
-        6 => REG_LINK,
-        7 => REG_MULTI_SZ,
-        8 => REG_RESOURCE_LIST,
-        9 => REG_FULL_RESOURCE_DESCRIPTOR,
-        10 => REG_RESOURCE_REQUIREMENTS_LIST,
-        11 => REG_QWORD,
-        _ => REG_BINARY,
-    }
-}
-
-fn read_reg(key: &RegKey) -> Result<RegNode> {
-    let mut node = RegNode::default();
-    for v in key.enum_values() {
-        let (name, value) = v.map_err(|e| Error::io("registry", e))?;
-        node.values.push(RegValue { name, kind: value.vtype as u32, data: value.bytes });
-    }
-    for k in key.enum_keys() {
-        let name = k.map_err(|e| Error::io("registry", e))?;
-        let sub = key.open_subkey_with_flags(&name, KEY_READ).map_err(|e| Error::io(&name, e))?;
-        node.keys.push((name, read_reg(&sub)?));
-    }
-    Ok(node)
-}
-
-fn write_reg(key: &RegKey, node: &RegNode) -> Result<()> {
-    for v in &node.values {
-        let value = winreg::RegValue { bytes: v.data.clone(), vtype: reg_type(v.kind) };
-        key.set_raw_value(&v.name, &value).map_err(|e| Error::io(&v.name, e))?;
-    }
-    for (name, sub) in &node.keys {
-        let (k, _) = key.create_subkey(name).map_err(|e| Error::io(name, e))?;
-        write_reg(&k, sub)?;
-    }
-    Ok(())
 }
 
 #[cfg(test)]

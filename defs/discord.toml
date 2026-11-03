@@ -13,3 +13,15 @@ notes = "Profiles only work on this PC and Windows user (Electron safeStorage)."
 kind = "dir"
 path = '%APPDATA%\discord\Local Storage'
 mode = "move"
+
+# The .deb and .tar.gz builds; Flatpak keeps its data under ~/.var/app instead.
+[os.linux]
+detect = ["discord", "/usr/share/discord/Discord"]
+processes = ["Discord"]
+launch = ["discord"]
+notes = "Profiles only work for this Linux user, whose keyring holds Discord's encryption key."
+
+[[os.linux.state]]
+kind = "dir"
+path = "~/.config/discord/Local Storage"
+mode = "move"

@@ -1,0 +1,84 @@
+# Tests and builds acswi on Windows and Linux. Pushing a v* tag also attaches both
+# downloads to that tag's GitHub release.
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            asset: acswi-windows-x64.zip
+          # The oldest supported Ubuntu, so the build runs on as many distributions as possible.
+          - os: ubuntu-22.04
+            asset: acswi-linux-x64.tar.gz
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Linux build libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev
+
+      - name: Test
+        run: cargo test --locked -p acswi-core -p acswi-cli
+
+      - name: Build
+        run: cargo build --locked --release --workspace
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory dist | Out-Null
+          Copy-Item target/release/acswi.exe, target/release/acswi-desktop.exe, LICENSE dist/
+          Compress-Archive -Path dist/* -DestinationPath ${{ matrix.asset }}
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir dist
+          cp target/release/acswi target/release/acswi-desktop LICENSE dist/
+          tar -czf ${{ matrix.asset }} -C dist acswi acswi-desktop LICENSE
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      # A tag without a release gets a draft one, published by hand after a look.
+      - name: Attach downloads to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --draft --title "$GITHUB_REF_NAME" --notes ""
+          gh release upload "$GITHUB_REF_NAME" acswi-windows-x64.zip acswi-linux-x64.tar.gz --clobber

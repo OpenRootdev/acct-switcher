@@ -7,6 +7,10 @@ processes = ["codex.exe"]
 login = ["codex", "login"]
 notes = "Assumes file credential storage (the default). With cli_auth_credentials_store = \"keyring\", add a credential item."
 
+[os.linux]
+processes = ["codex"]
+notes = "Assumes file credential storage (the default)."
+
 [[state]]
 kind = "file"
 path = "~/.codex/auth.json"
