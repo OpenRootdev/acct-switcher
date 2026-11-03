@@ -22,6 +22,10 @@
   <picture><source media="(prefers-color-scheme: dark)" srcset="https://github.com/OpenRootdev/acswi/raw/assets/brands/github-dark.svg"><img src="https://github.com/OpenRootdev/acswi/raw/assets/brands/github.svg" height="16" alt=""></picture>&nbsp;GitHub CLI &amp; Desktop &nbsp;·&nbsp; <img src="https://github.com/OpenRootdev/acswi/raw/assets/brands/claude.svg" height="16" alt="">&nbsp;Claude Code &nbsp;·&nbsp; <picture><source media="(prefers-color-scheme: dark)" srcset="https://github.com/OpenRootdev/acswi/raw/assets/brands/openai-dark.svg"><img src="https://github.com/OpenRootdev/acswi/raw/assets/brands/openai.svg" height="16" alt=""></picture>&nbsp;Codex &nbsp;·&nbsp; <img src="https://github.com/OpenRootdev/acswi/raw/assets/brands/discord.svg" height="16" alt="">&nbsp;Discord
 </p>
 
+<p align="center">
+  <a href="https://toolindex.org/tools/acswi/"><img src="https://toolindex.org/badges/acswi.svg" alt="Listed in ToolIndex"></a>
+</p>
+
 ## What it does
 
 Account Switcher (<code>acswi</code>) keeps a saved sign-in for every account you use in an app. Pick one in the window, the tray or the terminal, and the app is signed in to it, with no password or browser sign-in.
