@@ -44,6 +44,8 @@ Most account switchers cover one app, usually Codex or Claude Code. [TcNo Accoun
 - One place for command-line tools and desktop apps.
 - When an app already keeps several accounts (GitHub CLI, Azure CLI), acswi uses that instead of copying files.
 - `acswi learn` watches an app while you sign in and writes its definition for you.
+- It tells you when a saved sign-in is about to expire, before you find out mid-task.
+- Remote MCP servers in Claude Code and Codex (Notion, Figma, …) can have accounts of their own, switched separately from the app's own account.
 
 ## Get started
 

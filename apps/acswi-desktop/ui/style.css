@@ -141,6 +141,9 @@ section.app { margin-top: 14px; }
 .who { flex: 1; min-width: 0; }
 .who .name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .who .id { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.who .exp { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.who .exp.soon { color: var(--warn); }
+.who .exp.expired { color: var(--danger); font-weight: 500; }
 
 .state { color: var(--accent); font-size: 12px; padding-right: 6px; }
 

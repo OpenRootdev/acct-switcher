@@ -11,6 +11,10 @@ login = ["az", "login", "--allow-no-subscriptions"]
 login_env = { AZURE_CORE_LOGIN_EXPERIENCE_V2 = "off" }
 notes = "A profile is a user; switching selects that user's first subscription."
 
+[expiry]
+# Microsoft Entra refresh tokens stop working after 90 days without use.
+idle_days = 90
+
 [native]
 # Reading the profile file directly is much faster than `az account list`.
 list_file = "~/.azure/azureProfile.json"

@@ -37,7 +37,22 @@ mode = "move"
 | `dir` | `path`, `mode = "encrypt"` (default) or `"move"`, `exclude = ["*.log"]` | `encrypt`: files packed into the encrypted vault, excluded files stay shared. `move`: the folder is moved aside as-is (for big app folders) |
 | `credential` | `pattern` (Credential Manager target, `*`/`?` allowed). Windows only | encrypted copy |
 | `registry` | `key` under HKCU. Windows only | encrypted copy |
-| `json_key` | `path`, `keys = ["/oauthAccount"]` (JSON pointers) | only those keys; the rest of the file is left alone |
+| `json_key` | `path`, `keys = ["/oauthAccount"]` (JSON pointers) | only those keys; the rest of the file is left alone. A `*` in the last part (`"/mcpOAuth/notion\|*"`) takes every matching key of that object |
+
+## Expiry
+
+An optional `[expiry]` table tells acswi when a saved sign-in stops working, so it can warn
+before it does (see `acswi check` in [usage.md](usage.md#sign-ins-that-expire)):
+
+```toml
+[expiry]
+file = "~/.tool/credentials.json"        # a date stored with the sign-in...
+pointer = "/oauth/refreshTokenExpiresAt" # seconds or milliseconds since 1970, or an RFC 3339 date
+idle_days = 90                           # ...and/or: the provider signs out accounts unused this long
+```
+
+acswi reads only that date from the file, never a token. For the active account it reads it live;
+for the others it uses the date recorded when it last saved them. With both, the earlier one wins.
 
 ## Other strategies
 

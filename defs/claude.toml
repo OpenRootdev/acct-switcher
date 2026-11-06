@@ -1,5 +1,7 @@
-# Claude Code (standalone CLI) keeps one account: OAuth tokens in
-# ~/.claude/.credentials.json and the account record in ~/.claude.json.
+# Claude Code (standalone CLI) keeps one account: OAuth tokens under claudeAiOauth in
+# ~/.claude/.credentials.json and the account record in ~/.claude.json. Only those keys
+# are swapped: sign-ins to remote MCP servers (mcpOAuth in the same file) stay put, and
+# `acswi mcp` can give them accounts of their own.
 # Sessions inside the Claude desktop app sign in through the desktop app and
 # are not affected by switching. On macOS the tokens are in the Keychain instead,
 # so this definition is for Windows and Linux.
@@ -20,9 +22,16 @@ processes = ['*/.local/share/claude/versions/*']
 command = ["claude", "auth", "status", "--json"]
 pointer = "/email"
 
+[expiry]
+# The refresh token's own expiry date; Claude Code moves it on when it refreshes.
+file = "~/.claude/.credentials.json"
+pointer = "/claudeAiOauth/refreshTokenExpiresAt"
+
+# Profiles saved by acswi 0.2 kept the whole file; acswi takes this key out of those.
 [[state]]
-kind = "file"
+kind = "json_key"
 path = "~/.claude/.credentials.json"
+keys = ["/claudeAiOauth"]
 
 [[state]]
 kind = "json_key"

@@ -1,8 +1,9 @@
 use std::io::{BufRead, IsTerminal, Write};
 use std::process::ExitCode;
+use std::sync::atomic::{AtomicU8, Ordering};
 
 use acswi_core::engine::{Acswi, Actor, AddStep, AppView, SwitchOptions};
-use acswi_core::{learn, Code, Error, Strategy};
+use acswi_core::{expiry, learn, mcp, Code, Error, Expiry, Level, Strategy};
 use anstream::{eprintln, println};
 use anstyle::{AnsiColor, Style};
 use clap::{Parser, Subcommand};
@@ -13,6 +14,11 @@ const DIM: Style = Style::new().dimmed();
 const GREEN: Style = AnsiColor::Green.on_default();
 const YELLOW: Style = AnsiColor::Yellow.on_default();
 const RED: Style = AnsiColor::Red.on_default();
+
+/// Exit code for a command that worked but has bad news (`acswi check` finding expiring
+/// accounts); errors use their own codes.
+static EXIT: AtomicU8 = AtomicU8::new(0);
+const EXIT_EXPIRING: u8 = 7;
 
 /// Switch which account an app uses, without signing in again.
 ///
@@ -102,8 +108,21 @@ enum Cmd {
     },
     /// Show who each app is signed in as right now
     Status { app: Option<String> },
+    /// Show when saved sign-ins expire; exits with 7 if one has expired or expires soon
+    Check {
+        /// Only this app
+        app: Option<String>,
+        /// Count an account as expiring soon this many days ahead
+        #[arg(long, default_value_t = expiry::WARN_DAYS)]
+        days: i64,
+    },
     /// List the apps acswi knows how to switch
     Apps,
+    /// Find sign-ins to remote MCP servers (Claude Code, Codex) and give them accounts of their own
+    Mcp {
+        #[command(subcommand)]
+        cmd: Option<McpCmd>,
+    },
     /// Teach acswi a new app by watching what changes when you sign in
     Learn {
         /// Short id for the new app, e.g. "slack"
@@ -120,6 +139,20 @@ enum Cmd {
     /// `acswi <app>` lists an app, `acswi <app> <profile>` switches it
     #[command(external_subcommand)]
     Shortcut(Vec<String>),
+}
+
+#[derive(Subcommand)]
+enum McpCmd {
+    /// List remote MCP servers and whether acswi can switch their sign-in (the default)
+    #[command(visible_alias = "ls")]
+    List,
+    /// Set up switching for one server's sign-in, e.g. `acswi mcp add codex notion`
+    Add {
+        /// claude or codex
+        client: String,
+        /// The server's name in that client
+        server: String,
+    },
 }
 
 #[derive(Serialize)]
@@ -200,7 +233,7 @@ fn main() -> ExitCode {
         run(&ctx, cli.command, shortcut_close)
     });
     match result {
-        Ok(()) => ExitCode::SUCCESS,
+        Ok(()) => ExitCode::from(EXIT.load(Ordering::Relaxed)),
         Err(e) => {
             if json {
                 println!("{}", serde_json::to_string_pretty(&Err { ok: false, error: &e }).unwrap());
@@ -248,7 +281,10 @@ fn run(ctx: &Ctx, cmd: Option<Cmd>, shortcut_close: bool) -> Result<(), Error> {
             Ok(())
         }
         Some(Cmd::Status { app }) => status(ctx, app.as_deref()),
+        Some(Cmd::Check { app, days }) => check(ctx, app.as_deref(), days),
         Some(Cmd::Apps) => apps(ctx),
+        Some(Cmd::Mcp { cmd: None | Some(McpCmd::List) }) => mcp_list(ctx),
+        Some(Cmd::Mcp { cmd: Some(McpCmd::Add { client, server }) }) => mcp_add(ctx, &client, &server),
         Some(Cmd::Learn { id, name, hint }) => learn_app(ctx, &id, name, hint),
         Some(Cmd::Doctor) => doctor(ctx),
         Some(Cmd::Shortcut(args)) => match args.as_slice() {
@@ -312,7 +348,8 @@ fn print_app(v: &AppView, first: Option<usize>) {
             Some(i) if i != &p.name => i.as_str(),
             _ => "",
         };
-        println!("  {num}{mark} {:<width$}  {DIM}{ident}{DIM:#}", p.name);
+        let exp = p.expiry.as_ref().map(|e| format!("  {}", expiry_text(e, true))).unwrap_or_default();
+        println!("  {num}{mark} {:<width$}  {DIM}{ident}{DIM:#}{exp}", p.name);
     }
 }
 
@@ -406,6 +443,119 @@ fn status(ctx: &Ctx, app: Option<&str>) -> Result<(), Error> {
             };
             let open = if s.running.is_empty() { String::new() } else { format!("  {DIM}(open){DIM:#}") };
             println!("{BOLD}{:<16}{BOLD:#} {who}{prof}{warn}{open}", s.app);
+            for e in &s.expiring {
+                println!("{:<16} {YELLOW}!{YELLOW:#} {} {}", "", e.profile, expiry_text(&e.expiry, false));
+            }
+        }
+    });
+    Ok(())
+}
+
+/// "expires in 3 days", "expired 3 Nov 2026, sign in again", "until 23 Nov 2026"; `~` marks an estimate.
+fn expiry_text(e: &Expiry, quiet_ok: bool) -> String {
+    let approx = if e.estimated { "about " } else { "" };
+    let date = e.at.with_timezone(&chrono::Local).format("%-d %b %Y");
+    match e.level {
+        Level::Expired if e.estimated => format!("{RED}probably signed out after going unused, sign in again{RED:#}"),
+        Level::Expired => format!("{RED}expired {date}, sign in again{RED:#}"),
+        Level::Soon => {
+            let when = match e.days_left() {
+                0 => "today".to_string(),
+                1 => "tomorrow".to_string(),
+                n => format!("in {approx}{n} days"),
+            };
+            format!("{YELLOW}expires {when}{YELLOW:#}")
+        }
+        Level::Ok if quiet_ok => format!("{DIM}until {}{date}{DIM:#}", if e.estimated { "~" } else { "" }),
+        Level::Ok => format!("until {}{date}", if e.estimated { "about " } else { "" }),
+    }
+}
+
+fn check(ctx: &Ctx, app: Option<&str>, days: i64) -> Result<(), Error> {
+    #[derive(Serialize)]
+    struct Row {
+        app: String,
+        app_name: String,
+        profile: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        identity: Option<String>,
+        active: bool,
+        /// `None`: the app does not say when its sign-ins expire.
+        expires: Option<chrono::DateTime<chrono::Utc>>,
+        estimated: bool,
+        /// ok, soon, expired, in_use (only goes stale when unused), or unknown
+        level: &'static str,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        idle_days: Option<u32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        days_left: Option<i64>,
+    }
+    let mut rows = Vec::new();
+    for v in ctx.acswi.overview(app)? {
+        let idle_days = ctx.acswi.def(&v.id).ok().and_then(|d| d.expiry.as_ref()).and_then(|e| e.idle_days);
+        for p in v.profiles.iter().filter(|p| p.saved) {
+            let level = p.expiry.as_ref().map(|e| expiry::level(e.at, days));
+            let in_use = level.is_none() && p.active && idle_days.is_some();
+            rows.push(Row {
+                app: v.id.clone(),
+                app_name: v.name.clone(),
+                profile: p.name.clone(),
+                identity: p.identity.clone(),
+                active: p.active,
+                expires: p.expiry.as_ref().map(|e| e.at),
+                estimated: p.expiry.as_ref().is_some_and(|e| e.estimated),
+                idle_days,
+                level: match level {
+                    None if in_use => "in_use",
+                    Some(Level::Ok) => "ok",
+                    Some(Level::Soon) => "soon",
+                    Some(Level::Expired) => "expired",
+                    None => "unknown",
+                },
+                days_left: p.expiry.as_ref().map(Expiry::days_left),
+            });
+        }
+    }
+    let bad = rows.iter().filter(|r| matches!(r.level, "soon" | "expired")).count();
+    if bad > 0 {
+        EXIT.store(EXIT_EXPIRING, Ordering::Relaxed);
+    }
+    ctx.emit(&rows, |rows| {
+        if rows.is_empty() {
+            println!("No saved accounts yet.");
+            return;
+        }
+        let known: Vec<&Row> = rows.iter().filter(|r| r.level != "unknown").collect();
+        let width = known.iter().map(|r| r.app_name.len() + r.profile.len() + 1).max().unwrap_or(0);
+        for r in &known {
+            if r.level == "in_use" {
+                let label = format!("{} {}", r.app_name, r.profile);
+                let days = r.idle_days.unwrap_or_default();
+                println!("{GREEN}✓{GREEN:#} {label:<width$}  in use {DIM}(signed out after {days} days unused){DIM:#}");
+                continue;
+            }
+            let e = Expiry { at: r.expires.unwrap(), estimated: r.estimated, level: expiry::level(r.expires.unwrap(), days) };
+            let mark = match e.level {
+                Level::Ok => format!("{GREEN}✓{GREEN:#}"),
+                Level::Soon => format!("{YELLOW}!{YELLOW:#}"),
+                Level::Expired => format!("{RED}✗{RED:#}"),
+            };
+            let label = format!("{} {}", r.app_name, r.profile);
+            println!("{mark} {label:<width$}  {}", expiry_text(&e, false));
+        }
+        let mut unknown: Vec<&str> = rows.iter().filter(|r| r.level == "unknown").map(|r| r.app_name.as_str()).collect();
+        unknown.dedup();
+        if !unknown.is_empty() {
+            if !known.is_empty() {
+                println!();
+            }
+            println!("{DIM}No expiry date known for {}.{DIM:#}", unknown.join(", "));
+        }
+        if bad > 0 {
+            println!(
+                "
+{bad} account(s) expired or expire within {days} days. To renew one, switch to it and use it;                  if it was signed out, sign in again in the app and run `acswi save <app>`."
+            );
         }
     });
     Ok(())
@@ -451,6 +601,52 @@ fn apps(ctx: &Ctx) -> Result<(), Error> {
             "\n{DIM}Add your own: acswi learn <id>, or put a .toml file in {}{DIM:#}",
             ctx.acswi.paths.user_defs.display()
         );
+    });
+    Ok(())
+}
+
+fn mcp_list(ctx: &Ctx) -> Result<(), Error> {
+    let servers = mcp::find(&ctx.acswi.defs);
+    ctx.emit(&servers, |servers| {
+        if servers.is_empty() {
+            println!("No remote MCP servers found in Claude Code or Codex CLI.");
+            return;
+        }
+        let width = servers.iter().map(|s| s.server.len()).max().unwrap_or(0);
+        let mut client = None;
+        for s in servers.iter() {
+            if client != Some(s.client) {
+                if client.is_some() {
+                    println!();
+                }
+                println!("{BOLD}{}{BOLD:#}", s.client.name());
+                client = Some(s.client);
+            }
+            let signed = if s.signed_in { "signed in" } else { "not signed in" };
+            let next = if s.defined {
+                format!("{GREEN}set up{GREEN:#} {DIM}as {}{DIM:#}", s.app)
+            } else if let Some(p) = &s.problem {
+                format!("{YELLOW}{p}{YELLOW:#}")
+            } else {
+                format!("{DIM}acswi mcp add {} {}{DIM:#}", s.client.id(), s.server)
+            };
+            println!("  {:<width$}  {DIM}{signed:<13}{DIM:#}  {next}", s.server);
+        }
+    });
+    Ok(())
+}
+
+fn mcp_add(ctx: &Ctx, client: &str, server: &str) -> Result<(), Error> {
+    let (s, path) = mcp::add(&ctx.acswi.defs, &ctx.acswi.paths.user_defs, client, server)?;
+    ctx.emit(serde_json::json!({ "app": s.app, "definition": path, "signed_in": s.signed_in }), |_| {
+        println!("{GREEN}✓{GREEN:#} {} in {} now has its own accounts, as the app {BOLD}{}{BOLD:#}.", s.server, s.client.name(), s.app);
+        println!("  {DIM}{}{DIM:#}", path.display());
+        if s.signed_in {
+            println!("Next, name the account signed in now:  acswi save {} <name>", s.app);
+        } else {
+            println!("Next, sign in an account:  acswi add {}", s.app);
+        }
+        println!("Then add more with `acswi add {}` and switch with `acswi {} <name>`.", s.app, s.app);
     });
     Ok(())
 }

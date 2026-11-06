@@ -12,7 +12,7 @@ use crate::def::{DirMode, StateItem};
 use crate::error::{Code, Error, Result};
 use crate::paths::expand;
 use crate::state::write_atomic;
-use crate::vault::{PackedFile, Saved};
+use crate::vault::{PackedFile, Saved, Snapshot};
 
 /// Where `mode = "move"` folders of one profile are kept.
 pub struct MoveStore<'a> {
@@ -56,7 +56,7 @@ pub fn present(item: &StateItem) -> Result<bool> {
         StateItem::Credential { pattern } => !matching_credentials(pattern)?.is_empty(),
         StateItem::Registry { key } => registry::present(key)?,
         StateItem::JsonKey { path, keys } => match read_json(&expand(path))? {
-            Some(doc) => keys.iter().any(|k| doc.pointer(k).is_some()),
+            Some(doc) => keys.iter().any(|k| get_key(&doc, k).is_some()),
             None => false,
         },
     })
@@ -104,7 +104,7 @@ pub fn capture(item: &StateItem, store: &MoveStore) -> Result<Saved> {
             let doc = read_json(&expand(path))?;
             Saved::JsonKey(
                 keys.iter()
-                    .map(|k| doc.as_ref().and_then(|d| d.pointer(k)).map(|v| v.to_string()))
+                    .map(|k| doc.as_ref().and_then(|d| get_key(d, k)).map(|v| v.to_string()))
                     .collect(),
             )
         }
@@ -139,7 +139,7 @@ pub fn clear(item: &StateItem) -> Result<()> {
             let Some(mut doc) = read_json(&p)? else { return Ok(()) };
             let mut changed = false;
             for k in keys {
-                changed |= remove_pointer(&mut doc, k);
+                changed |= remove_key(&mut doc, k);
             }
             if changed {
                 write_json(&p, &doc)?;
@@ -150,6 +150,17 @@ pub fn clear(item: &StateItem) -> Result<()> {
 }
 
 // ---------- restore ----------
+
+/// For profiles saved while a definition kept the whole file (`kind = "file"`) and that now
+/// keeps only some keys of it: takes those keys out of the saved copy of the file.
+pub fn keys_from_file_snapshot(snap: &Snapshot, path: &str, keys: &[String]) -> Result<Option<Saved>> {
+    let whole = StateItem::File { path: path.to_string() }.describe();
+    let Some(Saved::File(Some(bytes))) = snap.get(&whole) else { return Ok(None) };
+    let bytes = bytes.strip_prefix(b"\xef\xbb\xbf".as_slice()).unwrap_or(bytes);
+    let doc: Value = serde_json::from_slice(bytes)
+        .map_err(|e| Error::new(Code::Recovery, format!("the saved copy of {path} is not JSON: {e}")))?;
+    Ok(Some(Saved::JsonKey(keys.iter().map(|k| get_key(&doc, k).map(|v| v.to_string())).collect())))
+}
 
 /// Writes a saved state back to the live location. `saved == None` means the profile has
 /// nothing stored for this item (e.g. the definition gained an item later).
@@ -201,7 +212,7 @@ pub fn restore(item: &StateItem, saved: Option<&Saved>, store: &MoveStore) -> Re
                 if let Some(text) = v {
                     let value: Value = serde_json::from_str(text)
                         .map_err(|e| Error::new(Code::Io, format!("bad saved value for {k}: {e}")))?;
-                    set_pointer(&mut doc, k, value);
+                    set_key(&mut doc, k, value);
                 }
             }
             write_json(&p, &doc)
@@ -339,6 +350,39 @@ fn write_json(p: &Path, doc: &Value) -> Result<()> {
     write_atomic(p, &text)
 }
 
+/// A JSON pointer whose last part has a `*` (`/mcpOAuth/notion|*`) stands for every key of
+/// that object matching the pattern. Returns the object's pointer and the pattern.
+fn wildcard_key(pointer: &str) -> Option<(&str, String)> {
+    let (parent, last) = pointer.rsplit_once('/')?;
+    last.contains('*').then(|| (parent, last.replace("~1", "/").replace("~0", "~")))
+}
+
+/// The value at `pointer`; for a wildcard pointer, an object of the matching keys.
+fn get_key(doc: &Value, pointer: &str) -> Option<Value> {
+    let Some((parent, pattern)) = wildcard_key(pointer) else { return doc.pointer(pointer).cloned() };
+    let obj = doc.pointer(parent)?.as_object()?;
+    let found: serde_json::Map<String, Value> =
+        obj.iter().filter(|(k, _)| crate::process::wildcard(&pattern, k)).map(|(k, v)| (k.clone(), v.clone())).collect();
+    (!found.is_empty()).then_some(Value::Object(found))
+}
+
+fn remove_key(doc: &mut Value, pointer: &str) -> bool {
+    let Some((parent, pattern)) = wildcard_key(pointer) else { return remove_pointer(doc, pointer) };
+    let Some(obj) = doc.pointer_mut(parent).and_then(Value::as_object_mut) else { return false };
+    let before = obj.len();
+    obj.retain(|k, _| !crate::process::wildcard(&pattern, k));
+    obj.len() != before
+}
+
+fn set_key(doc: &mut Value, pointer: &str, value: Value) {
+    let Some((parent, _)) = wildcard_key(pointer) else { return set_pointer(doc, pointer, value) };
+    if let Value::Object(found) = value {
+        for (k, v) in found {
+            set_pointer(doc, &format!("{parent}/{}", k.replace('~', "~0").replace('/', "~1")), v);
+        }
+    }
+}
+
 fn tokens(pointer: &str) -> Vec<String> {
     pointer.split('/').skip(1).map(|t| t.replace("~1", "/").replace("~0", "~")).collect()
 }
@@ -378,6 +422,19 @@ fn set_pointer(doc: &mut Value, pointer: &str, value: Value) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn json_wildcard_keys() {
+        let mut doc = serde_json::json!({"mcpOAuth": {"notion|ab12": {"t": 1}, "figma|cd34": {"t": 2}}, "claudeAiOauth": {"t": 3}});
+        let k = "/mcpOAuth/notion|*";
+        let saved = get_key(&doc, k).unwrap();
+        assert_eq!(saved, serde_json::json!({"notion|ab12": {"t": 1}}));
+        assert!(remove_key(&mut doc, k));
+        assert!(get_key(&doc, k).is_none());
+        assert!(doc.pointer("/mcpOAuth/figma|cd34").is_some() && doc.pointer("/claudeAiOauth").is_some());
+        set_key(&mut doc, k, saved);
+        assert_eq!(doc.pointer("/mcpOAuth/notion|ab12/t"), Some(&serde_json::json!(1)));
+    }
 
     #[test]
     fn json_pointer_edit_keeps_other_keys() {

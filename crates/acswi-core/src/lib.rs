@@ -10,7 +10,9 @@ pub mod dpapi;
 pub mod engine;
 pub mod envvar;
 pub mod error;
+pub mod expiry;
 pub mod items;
+pub mod mcp;
 pub mod learn;
 pub mod native;
 pub mod paths;
@@ -21,5 +23,6 @@ pub mod state;
 pub mod vault;
 
 pub use def::{AppDef, Strategy};
-pub use engine::{Acswi, Actor, AddStep, AppView, ProfileView, StatusView, SwitchOptions, SwitchReport};
+pub use engine::{Acswi, Actor, AddStep, AppView, ExpiringView, ProfileView, StatusView, SwitchOptions, SwitchReport};
 pub use error::{Code, Error, Result};
+pub use expiry::{Expiry, Level};

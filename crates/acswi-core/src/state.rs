@@ -46,11 +46,17 @@ pub struct Profile {
     pub saved: Option<DateTime<Utc>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub used: Option<DateTime<Utc>>,
+    /// When acswi last switched away from this account (it was in use until then).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub left: Option<DateTime<Utc>>,
+    /// Expiry date the app stored with the sign-in, read when acswi last saved it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expires: Option<DateTime<Utc>>,
 }
 
 impl Profile {
     pub fn new() -> Self {
-        Profile { identity: None, account: None, created: Utc::now(), saved: None, used: None }
+        Profile { identity: None, account: None, created: Utc::now(), saved: None, used: None, left: None, expires: None }
     }
 }
 

@@ -6,7 +6,7 @@
 |---|---|
 | GitHub CLI (`gh`) | its own account list (`gh auth switch`) |
 | Azure CLI (`az`) | its own account list (`az account set`); profile = user |
-| Claude Code (`claude`) | swaps `~/.claude/.credentials.json` and the `oauthAccount` entry in `~/.claude.json` |
+| Claude Code (`claude`) | swaps the `claudeAiOauth` entry in `~/.claude/.credentials.json` and the `oauthAccount` entry in `~/.claude.json`; MCP server sign-ins in the same file stay put |
 | Codex CLI (`codex`) | swaps `~/.codex/auth.json` |
 | GitHub Desktop (Windows only) | swaps its Credential Manager entries and its `Local Storage` folder |
 | Discord | swaps its `Local Storage` folder |

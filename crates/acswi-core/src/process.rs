@@ -16,7 +16,7 @@ pub struct Proc {
 }
 
 /// `*` wildcard match, case-insensitive.
-fn wildcard(pattern: &str, text: &str) -> bool {
+pub(crate) fn wildcard(pattern: &str, text: &str) -> bool {
     let p: Vec<char> = pattern.to_lowercase().chars().collect();
     let t: Vec<char> = text.to_lowercase().chars().collect();
     let (mut pi, mut ti, mut star, mut mark) = (0, 0, None, 0);

@@ -36,7 +36,22 @@ command = ["codex", "login", "status"]
 [[state]]                              # where sign-in state lives
 kind = "file"                          # file | dir | credential | registry | json_key
 path = "~/.codex/auth.json"
+
+# [expiry]                             # optional: when a saved sign-in stops working
+# idle_days = 90                       # the provider's limit for unused accounts, and/or
+# file = "...", pointer = "/..."       # a date stored with the sign-in (Claude Code has one)
 ```
+
+Expiry: `state.json` records per profile when acswi last switched away from it (`left`) and the
+stored expiry date at the last save (`expires`), never a token. Views compute an `expiry`
+(`at`, `estimated`, `level` = ok/soon/expired) from those, reading the date live for the active
+account. `acswi check` lists them and exits 7 if any is soon or expired.
+
+MCP: `acswi mcp` reads the remote MCP servers of Claude Code (`mcpServers` in `~/.claude.json`,
+sign-ins under `mcpOAuth` in `~/.claude/.credentials.json`) and Codex (`mcp_servers` in
+`config.toml`, sign-ins in Credential Manager as `<server>|<hash>.Codex MCP Credentials` or in
+`.credentials.json`). `acswi mcp add` writes a swap definition with just that server's item and
+`login = [client, "mcp", "login", server]`, so each server's sign-in has profiles of its own.
 
 State kinds:
 

@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Code, Error, Result};
+use crate::expiry::ExpirySpec;
 use crate::paths::{expand, valid_name, which};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -146,6 +147,9 @@ pub struct AppDef {
     pub native: Option<NativeSpec>,
     #[serde(default)]
     pub env: Option<EnvSpec>,
+    /// When a saved sign-in stops working, so acswi can warn before it does.
+    #[serde(default)]
+    pub expiry: Option<ExpirySpec>,
     /// Shown to the user: limits, tips.
     #[serde(default)]
     pub notes: Option<String>,
@@ -173,6 +177,7 @@ pub struct OsOverride {
     pub state: Option<Vec<StateItem>>,
     pub native: Option<NativeSpec>,
     pub env: Option<EnvSpec>,
+    pub expiry: Option<ExpirySpec>,
     pub notes: Option<String>,
 }
 
@@ -211,7 +216,7 @@ impl AppDef {
         macro_rules! take_opt {
             ($($field:ident),*) => { $(if o.$field.is_some() { self.$field = o.$field; })* };
         }
-        take_opt!(identity, native, env, notes);
+        take_opt!(identity, native, env, expiry, notes);
         Ok(())
     }
 
@@ -229,6 +234,9 @@ impl AppDef {
             Strategy::Env if self.env.is_none() => fail("env strategy needs an [env] table".into()),
             _ => Ok(()),
         }?;
+        if let Some(e) = &self.expiry {
+            e.validate().or_else(fail)?;
+        }
         for item in &self.state {
             if let StateItem::Credential { pattern } = item {
                 if pattern.trim_matches(['*', '?']).is_empty() {

@@ -28,6 +28,8 @@ acswi save claude me          save the account Claude Code is signed in to now a
 acswi save claude             update the saved copy of the active account
 acswi rename az someone@contoso.onmicrosoft.com work
 acswi status                  who each app is signed in as right now
+acswi check                   when saved sign-ins expire (see below)
+acswi mcp                     sign-ins to remote MCP servers (see below)
 acswi remove discord old      delete a saved account
 acswi apps                    which apps acswi knows
 acswi learn slack             teach acswi a new app (see adding-apps.md)
@@ -39,6 +41,60 @@ afterwards.
 
 An unfinished add (for example when the sign-in window was closed) shows up in `acswi`; finish or
 undo it with `acswi add <app> --finish` or `acswi add <app> --cancel`.
+
+## Sign-ins that expire
+
+Sign-ins don't last forever. Some apps store an expiry date next to their tokens, and some
+providers sign out accounts that go unused for a while. acswi shows this next to each account in
+`acswi`, `acswi status` and the window (`until 23 Nov 2026`, `expires in 3 days`, `expired, sign
+in again`), and the tray marks expiring accounts. `acswi check` lists every account:
+
+```
+✓ Azure CLI second      in use (signed out after 90 days unused)
+✓ Claude Code work      until 23 Nov 2026
+! Claude Code personal  expires in 3 days
+✗ GitHub CLI old-job    probably signed out after going unused, sign in again
+
+No expiry date known for Codex CLI, Discord.
+```
+
+It exits with 7 when an account has expired or expires within 7 days (`--days 14` to look further
+ahead), so it can run on a schedule.
+
+| app | what acswi knows |
+|---|---|
+| Claude Code | the date Claude Code stores with its sign-in; it moves on each time Claude Code refreshes it |
+| GitHub CLI | GitHub revokes a token unused for a year, so a saved account not used for a year is probably signed out |
+| Azure CLI | Microsoft sign-ins stop working after 90 days without use |
+| others | no date is known; they work until the app or provider ends the sign-in |
+
+Dates marked `~` or "about" are estimates from when acswi last switched away from the account.
+Using an account resets the count. To renew one that has expired, switch to it, sign in again in
+the app, then run `acswi save <app>` so the saved copy is the new sign-in.
+
+## Remote MCP servers
+
+Claude Code and Codex CLI sign in to remote MCP servers (Notion, Figma, Sentry, …) separately
+from your own account, one sign-in per server. `acswi mcp` lists the remote servers each one
+knows, and `acswi mcp add <client> <server>` gives one server's sign-in its own accounts:
+
+```
+acswi mcp                     list remote servers and whether they are signed in
+acswi mcp add codex notion    make "notion MCP (Codex CLI)" an app with accounts of its own
+acswi save codex-mcp-notion personal
+acswi add codex-mcp-notion work    signs out, runs `codex mcp login notion`, saves "work"
+acswi codex-mcp-notion personal    switch back
+```
+
+`mcp add` writes an app definition (for example `codex-mcp-notion.toml`) into your apps folder,
+so the server shows up like any other app, also in the window and tray. Switching it changes
+only that server's sign-in: the client's own account and its other servers stay as they are. The
+client has to be closed while switching, since it holds the server's tokens while it runs.
+
+Codex keeps these sign-ins in Credential Manager on Windows. On Linux it uses the system keyring,
+which acswi can't switch; set `mcp_oauth_credentials_store = "file"` in `~/.codex/config.toml`
+and sign in again to use acswi there. Claude Code keeps them in `~/.claude/.credentials.json`
+on both.
 
 ## The desktop app
 
@@ -65,6 +121,7 @@ Add `--json` to any command. Output is always `{"ok": true, "data": …}` or
 | 4 | `needs_human` | signing in needs a person (`add`, `learn`) |
 | 5 | `unknown_app`, `unknown_profile` | `details.profiles` lists the valid names |
 | 6 | `unsaved_session`, `identity_mismatch` | the live account is not the one acswi expected; nothing was changed |
+| 7 | | `acswi check` only: an account has expired or expires soon (the output is still `"ok": true`) |
 | 1 | anything else | see `error.message` |
 
 Agents switch by profile name (`acswi use gh work --json`). There is no command that prints a

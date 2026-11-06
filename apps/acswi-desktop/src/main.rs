@@ -242,7 +242,12 @@ fn build_menu(handle: &AppHandle, views: &[AppView]) -> tauri::Result<Menu<Wry>>
         let sub = Submenu::new(handle, &v.name, true)?;
         for p in &v.profiles {
             let id = format!("use{SEP}{}{SEP}{}", v.id, p.name);
-            sub.append(&CheckMenuItem::with_id(handle, id, &p.name, true, p.active, None::<&str>)?)?;
+            let label = match p.expiry.as_ref().map(|e| e.level) {
+                Some(acswi_core::Level::Expired) => format!("{} (expired)", p.name),
+                Some(acswi_core::Level::Soon) => format!("{} (expires soon)", p.name),
+                _ => p.name.clone(),
+            };
+            sub.append(&CheckMenuItem::with_id(handle, id, label, true, p.active, None::<&str>)?)?;
         }
         menu.append(&sub)?;
         any = true;

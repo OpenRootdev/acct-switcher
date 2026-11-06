@@ -7,8 +7,9 @@ use std::time::{Duration, Instant};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
-use crate::def::{AppDef, Defs, Strategy};
+use crate::def::{AppDef, Defs, StateItem, Strategy};
 use crate::error::{bail, Code, Error, Result};
+use crate::expiry::{self, Expiry};
 use crate::items::{self, MoveStore};
 use crate::native::{self, NativeAccount};
 use crate::paths::{valid_name, Paths};
@@ -50,6 +51,9 @@ pub struct ProfileView {
     pub saved: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_used: Option<chrono::DateTime<Utc>>,
+    /// When this sign-in stops working, if the app's definition says how to tell.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expiry: Option<Expiry>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -99,6 +103,16 @@ pub struct StatusView {
     pub signed_in: bool,
     pub in_sync: bool,
     pub running: Vec<Proc>,
+    /// Accounts of this app that have expired or expire soon.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub expiring: Vec<ExpiringView>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ExpiringView {
+    pub profile: String,
+    #[serde(flatten)]
+    pub expiry: Expiry,
 }
 
 /// What the caller must do to finish `add`.
@@ -231,6 +245,7 @@ impl Acswi {
                 identity: p.identity.clone().or_else(|| p.account.clone()),
                 saved: true,
                 last_used: p.used,
+                expiry: None,
             })
             .collect();
         if def.strategy == Strategy::Native && installed {
@@ -253,6 +268,7 @@ impl Acswi {
                                 identity: Some(acc.account.clone()),
                                 saved: false,
                                 last_used: None,
+                                expiry: None,
                             });
                         }
                     }
@@ -263,6 +279,20 @@ impl Acswi {
         }
         for p in &mut profiles {
             p.active = active.as_deref() == Some(p.name.as_str());
+        }
+        if let Some(spec) = &def.expiry {
+            for pv in profiles.iter_mut().filter(|p| p.saved) {
+                let Some(p) = app_state.profiles.get(&pv.name) else { continue };
+                // The signed-in account's date is read fresh; it moves on every token refresh.
+                let stored = if pv.active && def.strategy == Strategy::Swap {
+                    expiry::read_live(spec).or(p.expires)
+                } else {
+                    p.expires
+                };
+                // An account in use is not idle.
+                let idle_since = if pv.active { None } else { [p.left, p.saved, p.used].into_iter().flatten().max() };
+                pv.expiry = expiry::combine(spec, stored, idle_since);
+            }
         }
         let unsaved = def.strategy == Strategy::Swap
             && installed
@@ -301,8 +331,14 @@ impl Acswi {
             (Some(l), Some(e)) => l.eq_ignore_ascii_case(e),
             _ => true,
         };
+        let expiring = view
+            .profiles
+            .iter()
+            .filter_map(|p| p.expiry.clone().filter(|e| e.level != expiry::Level::Ok).map(|e| ExpiringView { profile: p.name.clone(), expiry: e }))
+            .collect();
         Ok(StatusView {
             app: def.id.clone(),
+            expiring,
             active: view.active,
             live_identity: live,
             expected_identity: expected,
@@ -379,8 +415,12 @@ impl Acswi {
             native::switch(def.native.as_ref().unwrap(), &target.value)?;
         }
         let name = self.native_name(def, &account);
-        if let Some(p) = state.app_mut(&def.id).profiles.get_mut(&name) {
+        let app_state = state.app_mut(&def.id);
+        if let Some(p) = app_state.profiles.get_mut(&name) {
             p.used = Some(Utc::now());
+        }
+        if let Some(p) = from.as_ref().filter(|_| changed).and_then(|f| app_state.profiles.get_mut(f)) {
+            p.left = Some(Utc::now());
         }
         self.save_state(&state)?;
         Ok(SwitchReport {
@@ -524,6 +564,7 @@ impl Acswi {
             Some(spec) => native::identity(spec).unwrap_or(None),
             None => None,
         };
+        let live_expiry = def.expiry.as_ref().and_then(expiry::read_live);
         if let (Some(rec), Some(live)) = (&recorded, &live_identity) {
             if !rec.eq_ignore_ascii_case(live) && !force {
                 return Err(Error::new(
@@ -567,6 +608,10 @@ impl Acswi {
         let app_state = state.app_mut(&def.id);
         if let Some(p) = app_state.profiles.get_mut(profile) {
             p.saved = Some(Utc::now());
+            p.left = p.saved;
+            if live_expiry.is_some() {
+                p.expires = live_expiry;
+            }
             if p.identity.is_none() || force {
                 p.identity = live_identity;
             }
@@ -582,7 +627,11 @@ impl Acswi {
         let store = MoveStore { profile_dir: &pdir };
         for item in &def.state {
             let saved = snap.as_ref().and_then(|s| s.get(&item.describe()));
-            items::restore(item, saved, &store)?;
+            let legacy = match (saved, item, &snap) {
+                (None, StateItem::JsonKey { path, keys }, Some(s)) => items::keys_from_file_snapshot(s, path, keys)?,
+                _ => None,
+            };
+            items::restore(item, saved.or(legacy.as_ref()), &store)?;
         }
         Ok(())
     }
@@ -662,6 +711,7 @@ impl Acswi {
                 let app_state = state.app_mut(&def.id);
                 let p = app_state.profiles.entry(profile.into()).or_default();
                 p.saved = Some(Utc::now());
+                p.expires = def.expiry.as_ref().and_then(expiry::read_live).or(p.expires);
                 if identity.is_some() {
                     p.identity = identity;
                 }
@@ -704,6 +754,7 @@ impl Acswi {
         let mut state = self.state()?;
         if let Some(p) = state.app_mut(&def.id).profiles.get_mut(&active) {
             p.saved = Some(Utc::now());
+            p.expires = def.expiry.as_ref().and_then(expiry::read_live).or(p.expires);
         }
         self.save_state(&state)?;
         Ok(Some(active))
@@ -824,6 +875,7 @@ impl Acswi {
                     p.identity = identity;
                     p.saved = Some(Utc::now());
                     p.used = Some(Utc::now());
+                    p.expires = def.expiry.as_ref().and_then(expiry::read_live);
                 }
                 app_state.active = Some(profile.clone());
                 app_state.pending = None;

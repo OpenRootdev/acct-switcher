@@ -8,6 +8,10 @@ detect = ["gh"]
 login = ["gh", "auth", "login", "--hostname", "github.com", "--web", "--git-protocol", "https"]
 notes = "git over HTTPS follows the active gh account if you ran `gh auth setup-git`."
 
+[expiry]
+# GitHub revokes OAuth tokens that go unused for a year.
+idle_days = 365
+
 [native]
 list = ["gh", "auth", "status", "--json", "hosts"]
 items = "/hosts/github.com"

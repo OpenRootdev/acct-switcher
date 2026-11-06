@@ -118,8 +118,33 @@ function renderApp(app) {
   );
 }
 
+const dateFmt = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric" });
+
+// "until 23 Nov 2026", "expires in 3 days", "expired, sign in again". Estimates come from how
+// long the provider keeps unused accounts signed in, so they are marked with ~.
+function expiryText(e) {
+  if (!e) return null;
+  const at = new Date(e.at);
+  const days = Math.floor((at - Date.now()) / 86400000);
+  const approx = e.estimated ? "~" : "";
+  if (e.level === "expired") {
+    return e.estimated ? "Probably signed out after going unused · sign in again" : `Expired ${dateFmt.format(at)} · sign in again`;
+  }
+  if (e.level === "soon") return `Expires ${days <= 0 ? "today" : days === 1 ? "tomorrow" : `in ${approx}${days} days`}`;
+  return `Until ${approx}${dateFmt.format(at)}`;
+}
+
+function expiryTitle(app, e) {
+  if (!e) return null;
+  const when = new Date(e.at).toLocaleString();
+  return e.estimated
+    ? `Estimate: ${app.name} signs out accounts that go unused for a while. If this one is still in use, it stays signed in. (${when})`
+    : `${app.name} says this sign-in expires ${when}. Signing in again renews it.`;
+}
+
 function renderProfile(app, p) {
   const sub = p.identity && p.identity !== p.name ? p.identity : null;
+  const exp = expiryText(p.expiry);
   const row = el("div", {
     class: "row" + (p.active ? " active" : ""),
     role: "button",
@@ -133,7 +158,11 @@ function renderProfile(app, p) {
     onkeydown: activateOnKey,
   },
     el("span", { class: "dot", "aria-hidden": "true" }),
-    el("div", { class: "who" }, el("div", { class: "name" }, p.name), sub ? el("div", { class: "id" }, sub) : null),
+    el("div", { class: "who" },
+      el("div", { class: "name" }, p.name),
+      sub ? el("div", { class: "id" }, sub) : null,
+      exp ? el("div", { class: "exp " + p.expiry.level, title: expiryTitle(app, p.expiry) }, exp) : null,
+    ),
     p.active ? el("span", { class: "state" }, "Active") : el("button", { class: "use", tabindex: -1 }, "Use"),
   );
   const more = el("button", {
